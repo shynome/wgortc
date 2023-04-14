@@ -14,7 +14,7 @@ import (
 )
 
 func TestServer(t *testing.T) {
-	if strings.HasSuffix(os.Args[0], "__debug_bin") == false {
+	if !debug {
 		return
 	}
 	dev := startServer()
@@ -22,7 +22,7 @@ func TestServer(t *testing.T) {
 }
 
 func TestClient(t *testing.T) {
-	if strings.HasSuffix(os.Args[0], "__debug_bin") == false {
+	if !debug {
 		return
 	}
 	dev, _ := startClient()
@@ -36,14 +36,35 @@ func TestNet(t *testing.T) {
 	defer dev2.Close()
 }
 
+func TestReconnect(t *testing.T) {
+	dev := startServer()
+	dev2, tnet := startClient()
+	defer dev2.Close()
+
+	dev.Close()
+	dev = startServer()
+	defer dev.Close()
+
+	client := http.Client{Transport: &http.Transport{DialContext: tnet.DialContext}}
+	resp := try.To1(client.Get("http://192.168.4.29/"))
+	body := try.To1(io.ReadAll(resp.Body))
+	t.Log(string(body))
+
+}
+
 func TestDevClose(t *testing.T) {
 	dev := startServer()
 	// time.Sleep(time.Second * 5)
 	dev.Close()
 }
 
+var debug = false
+
 func TestMain(m *testing.M) {
-	loglevel = device.LogLevelError
+	debug = strings.HasSuffix(os.Args[0], "__debug_bin")
+	if !debug {
+		loglevel = device.LogLevelError
+	}
 	m.Run()
 }
 

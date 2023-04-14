@@ -56,6 +56,7 @@ func (b *Bind) Open(port uint16) (fns []conn.ReceiveFunc, actualPort uint16, err
 	fns = append(fns, b.receiveFunc)
 
 	b.msgCh = make(chan packetMsg, b.BatchSize()-1)
+	b.pcs = make([]*webrtc.PeerConnection, 0)
 
 	settingEngine := webrtc.SettingEngine{}
 	if mux.WithUDPMux != nil {
@@ -135,6 +136,13 @@ func (b *Bind) handleConnect(ev eventsource.Event) {
 			ep.dsiableReconnect = true
 		})
 		dc.OnMessage(b.receiveMsg(ep))
+	})
+	pc.OnConnectionStateChange(func(pcs webrtc.PeerConnectionState) {
+		if pcs == webrtc.PeerConnectionStateConnected {
+			b.pcsL.Lock()
+			defer b.pcsL.Unlock()
+			b.pcs = append(b.pcs, pc)
+		}
 	})
 
 	try.To(pc.SetRemoteDescription(offer))
