@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/donovanhide/eventsource"
 	"github.com/lainio/err2"
@@ -139,16 +140,38 @@ func (b *Bind) handleConnect(ev eventsource.Event) {
 			})
 			dc.OnMessage(b.receiveMsg(ep))
 		case "alive":
-			dc.OnMessage(func(msg webrtc.DataChannelMessage) {
-				dc.Send(msg.Data)
-			})
+			go func() {
+				t := time.NewTimer(10 * time.Second)
+				defer func() {
+					<-t.C
+					pc.Close()
+				}()
+				// recive "ping" every 3s
+				dc.OnMessage(func(msg webrtc.DataChannelMessage) {
+					dc.SendText("pong")
+					t.Reset(10 * time.Second)
+				})
+				dc.OnClose(func() {
+					t.Stop()
+				})
+			}()
 		}
 	})
+	var i int = -1
 	pc.OnConnectionStateChange(func(pcs webrtc.PeerConnectionState) {
-		if pcs == webrtc.PeerConnectionStateConnected {
+		switch pcs {
+		case webrtc.PeerConnectionStateConnected:
 			b.pcsL.Lock()
 			defer b.pcsL.Unlock()
+			i = len(b.pcs)
 			b.pcs = append(b.pcs, pc)
+		case webrtc.PeerConnectionStateClosed:
+			if i < 0 {
+				return
+			}
+			b.pcsL.Lock()
+			defer b.pcsL.Unlock()
+			b.pcs[i] = nil
 		}
 	})
 

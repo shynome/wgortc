@@ -2,10 +2,8 @@ package wgortc
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
-	"math/rand"
 	"net/http"
 	"net/netip"
 	"sync"
@@ -113,76 +111,27 @@ func (ep *Endpoint) checkalive(pc *webrtc.PeerConnection) {
 	}
 	dc := try.To1(pc.CreateDataChannel("alive", dcinit))
 
-	evs := map[string]chan any{}
-	var locker sync.Locker = &sync.Mutex{}
-	deleteCh := func(id string) {
-		locker.Lock()
-		defer locker.Unlock()
-		ch, ok := evs[id]
-		if !ok {
-			return
-		}
-		close(ch)
-		delete(evs, id)
-	}
-	addCh := func() (string, <-chan any) {
-		locker.Lock()
-		defer locker.Unlock()
-		ch := make(chan any)
-		buf := make([]byte, 32)
-		var id string
-
-		for {
-			rand.Read(buf)
-			id = string(buf)
-			if _, ok := evs[string(id)]; !ok {
-				evs[string(id)] = ch
-				break
-			}
-		}
-		return id, ch
-	}
+	t := time.NewTimer(10 * time.Second)
+	defer func() {
+		<-t.C
+		pc.Close()
+	}()
 	dc.OnMessage(func(msg webrtc.DataChannelMessage) {
-		id := string(msg.Data)
-		deleteCh(id)
+		t.Reset(10 * time.Second)
 	})
-	t := time.NewTicker(3 * time.Second)
+	var ticker *time.Ticker
 	dc.OnOpen(func() {
-		for range t.C {
-			func() {
-				if ep.err != nil {
-					return
-				}
-
-				id, ch := addCh()
-
-				ctx := context.Background()
-				ctx, cancelWith := context.WithCancelCause(ctx)
-				ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-				defer cancel()
-				go func() {
-					<-ctx.Done()
-					deleteCh(id)
-				}()
-
-				dc.SendText(id)
-
-				select {
-				case <-ctx.Done():
-					switch err := context.Cause(ctx); err {
-					case context.Canceled:
-						// normal cancel
-					default:
-						ep.err = err
-						pc.Close()
-					}
-				case <-ch:
-					cancelWith(nil)
-				}
-			}()
-		}
+		ticker = time.NewTicker(3 * time.Second)
+		go func() {
+			for range ticker.C {
+				dc.SendText("ping")
+			}
+		}()
 	})
 	dc.OnClose(func() {
+		if ticker != nil {
+			ticker.Stop()
+		}
 		t.Stop()
 	})
 }
