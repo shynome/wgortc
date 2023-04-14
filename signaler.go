@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/lainio/err2/try"
 )
@@ -19,8 +20,8 @@ func newSignaler(endpoint string) *signaler {
 	u := try.To1(url.Parse(endpoint))
 	return &signaler{
 		endpoint: u,
-		client:   &http.Client{
-			// Timeout: 10 * time.Second,
+		client: &http.Client{
+			Timeout: 10 * time.Second,
 		},
 	}
 }

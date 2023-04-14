@@ -85,7 +85,7 @@ func (ep *Endpoint) connect() {
 	try.To(json.NewDecoder(res.Body).Decode(&roffer))
 	try.To(pc.SetRemoteDescription(roffer))
 
-	try.To(waitDC(dc, 10*time.Second))
+	try.To(waitDC(dc, 5*time.Second))
 	ep.dc = dc
 
 	go func() {
