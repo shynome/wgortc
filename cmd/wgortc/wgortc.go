@@ -8,6 +8,7 @@ import (
 	"github.com/lainio/err2/try"
 	"github.com/shynome/wgortc"
 	"golang.zx2c4.com/wireguard/device"
+	"golang.zx2c4.com/wireguard/ipc"
 	"golang.zx2c4.com/wireguard/tun"
 )
 
@@ -29,5 +30,12 @@ func main() {
 	logger := device.NewLogger(*loglevel, *id)
 	dev := device.NewDevice(tdev, bind, logger)
 
-	<-dev.Wait()
+	f := try.To1(ipc.UAPIOpen(*tdevn))
+	uapi := try.To1(ipc.UAPIListen(*tdevn, f))
+
+	fmt.Printf("wgortc: node %s is running on tun %s\n", *id, *tdevn)
+	for {
+		conn := try.To1(uapi.Accept())
+		go dev.IpcHandle(conn)
+	}
 }
