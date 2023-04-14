@@ -130,12 +130,19 @@ func (b *Bind) handleConnect(ev eventsource.Event) {
 	}
 	pc = try.To1(b.api.NewPeerConnection(config))
 	pc.OnDataChannel(func(dc *webrtc.DataChannel) {
-		ep := b.NewEndpoint(sdp.Origin.Username)
-		ep.init.Do(func() {
-			ep.dc = dc
-			ep.dsiableReconnect = true
-		})
-		dc.OnMessage(b.receiveMsg(ep))
+		switch dc.Label() {
+		case "wgortc":
+			ep := b.NewEndpoint(sdp.Origin.Username)
+			ep.init.Do(func() {
+				ep.dc = dc
+				ep.dsiableReconnect = true
+			})
+			dc.OnMessage(b.receiveMsg(ep))
+		case "alive":
+			dc.OnMessage(func(msg webrtc.DataChannelMessage) {
+				dc.Send(msg.Data)
+			})
+		}
 	})
 	pc.OnConnectionStateChange(func(pcs webrtc.PeerConnectionState) {
 		if pcs == webrtc.PeerConnectionStateConnected {

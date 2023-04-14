@@ -2,8 +2,10 @@ package wgortc
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
+	"math/rand"
 	"net/http"
 	"net/netip"
 	"sync"
@@ -61,6 +63,7 @@ func (ep *Endpoint) connect() {
 		ICEServers: b.ICEServers,
 	}
 	pc = try.To1(b.api.NewPeerConnection(config))
+	go ep.checkalive(pc)
 
 	dcinit := webrtc.DataChannelInit{
 		Ordered:        refVal(false),
@@ -91,9 +94,97 @@ func (ep *Endpoint) connect() {
 	go func() {
 		b.pcsL.Lock()
 		defer b.pcsL.Unlock()
+		i := len(b.pcs)
 		b.pcs = append(b.pcs, pc)
+		pc.OnConnectionStateChange(func(pcs webrtc.PeerConnectionState) {
+			if pcs == webrtc.PeerConnectionStateClosed {
+				b.pcsL.Lock()
+				defer b.pcsL.Unlock()
+				b.pcs[i] = nil
+			}
+		})
 	}()
 
+}
+func (ep *Endpoint) checkalive(pc *webrtc.PeerConnection) {
+
+	dcinit := &webrtc.DataChannelInit{
+		Ordered: refVal(false),
+	}
+	dc := try.To1(pc.CreateDataChannel("alive", dcinit))
+
+	evs := map[string]chan any{}
+	var locker sync.Locker = &sync.Mutex{}
+	deleteCh := func(id string) {
+		locker.Lock()
+		defer locker.Unlock()
+		ch, ok := evs[id]
+		if !ok {
+			return
+		}
+		close(ch)
+		delete(evs, id)
+	}
+	addCh := func() (string, <-chan any) {
+		locker.Lock()
+		defer locker.Unlock()
+		ch := make(chan any)
+		buf := make([]byte, 32)
+		var id string
+
+		for {
+			rand.Read(buf)
+			id = string(buf)
+			if _, ok := evs[string(id)]; !ok {
+				evs[string(id)] = ch
+				break
+			}
+		}
+		return id, ch
+	}
+	dc.OnMessage(func(msg webrtc.DataChannelMessage) {
+		id := string(msg.Data)
+		deleteCh(id)
+	})
+	t := time.NewTicker(3 * time.Second)
+	dc.OnOpen(func() {
+		for range t.C {
+			func() {
+				if ep.err != nil {
+					return
+				}
+
+				id, ch := addCh()
+
+				ctx := context.Background()
+				ctx, cancelWith := context.WithCancelCause(ctx)
+				ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+				defer cancel()
+				go func() {
+					<-ctx.Done()
+					deleteCh(id)
+				}()
+
+				dc.SendText(id)
+
+				select {
+				case <-ctx.Done():
+					switch err := context.Cause(ctx); err {
+					case context.Canceled:
+						// normal cancel
+					default:
+						ep.err = err
+						pc.Close()
+					}
+				case <-ch:
+					cancelWith(nil)
+				}
+			}()
+		}
+	})
+	dc.OnClose(func() {
+		t.Stop()
+	})
 }
 func (ep *Endpoint) resetWhenWrong(err *error) {
 	if ep.dsiableReconnect {
