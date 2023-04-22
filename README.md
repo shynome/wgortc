@@ -6,10 +6,32 @@ replace `conn.Bind` with this. more details see [example/main.go](./example/main
 
 ```go
 	// the signaler server is only for test
-	bind := wgortc.NewBind("client", "https://test:test@signaler.slive.fun")
+	signaler := lens2.NewSignaler("client", "https://test:test@signaler.slive.fun")
+	bind := wgortc.NewBind(signaler)
 	dev = device.NewDevice(tun, bind, device.NewLogger(loglevel, "client"))
 ```
 
-## Deps
+## Custom Signaler Server
 
-- sinagler server source repo - <https://github.com/shynome/lens2>
+implement the `signaler.Channel` interface
+
+```go
+package signaler
+
+import "github.com/pion/webrtc/v3"
+
+type SDP = webrtc.SessionDescription
+
+type Channel interface {
+	Handshake(endpoint string, offer SDP) (answer *SDP, err error)
+	Accept() (offerCh <-chan Session, err error)
+
+	Close() error
+}
+
+type Session interface {
+	Description() (offer SDP)
+	Resolve(answer *SDP) (err error)
+	Reject(err error)
+}
+```
