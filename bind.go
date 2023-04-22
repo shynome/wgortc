@@ -17,7 +17,6 @@ import (
 )
 
 type Bind struct {
-	id       string
 	signaler signaler.Channel
 
 	pcs  []*webrtc.PeerConnection
@@ -35,9 +34,8 @@ type Bind struct {
 
 var _ conn.Bind = (*Bind)(nil)
 
-func NewBind(id string, signaler signaler.Channel) *Bind {
+func NewBind(signaler signaler.Channel) *Bind {
 	return &Bind{
-		id:       id,
 		signaler: signaler,
 
 		pcsL: &sync.Mutex{},
