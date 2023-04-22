@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"io"
 	"log"
 	"net"
@@ -10,25 +9,18 @@ import (
 
 	"github.com/lainio/err2/try"
 	"github.com/shynome/wgortc"
+	"github.com/shynome/wgortc/signaler/local"
 	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"
 	"golang.zx2c4.com/wireguard/tun/netstack"
 )
 
 func main() {
-	runServer := flag.Bool("server", false, "")
-	flag.Parse()
-	if *runServer {
-		dev := startServer()
-		// <-dev.Wait()
-		dev.Close()
-		return
-	} else {
-		startClient()
-	}
+	startServer()
+	startClient()
 }
 
-var signaler = "https://test:test@signaler.slive.fun"
+var hub = local.NewHub()
 var loglevel = device.LogLevelVerbose
 
 func startServer() (dev *device.Device) {
@@ -39,6 +31,8 @@ func startServer() (dev *device.Device) {
 	)
 	try.To(err)
 	var bind conn.Bind
+	var signaler = local.NewServer()
+	hub.Register("server", signaler)
 	bind = wgortc.NewBind("server", signaler)
 	// bind = conn.NewDefaultBind()
 	dev = device.NewDevice(tdev, bind, device.NewLogger(loglevel, "server"))
@@ -67,6 +61,8 @@ func startClient() (dev *device.Device, tnet *netstack.Net) {
 		[]netip.Addr{netip.MustParseAddr("8.8.8.8")},
 		1420)
 	try.To(err)
+	var signaler = local.NewServer()
+	hub.Register("client", signaler)
 	bind := wgortc.NewBind("client", signaler)
 	dev = device.NewDevice(tun, bind, device.NewLogger(loglevel, "client"))
 	err = dev.IpcSet(`private_key=087ec6e14bbed210e7215cdc73468dfa23f080a1bfb8665b2fd809bd99d28379

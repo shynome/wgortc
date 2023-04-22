@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/lainio/err2"
 	"github.com/lainio/err2/try"
@@ -71,6 +72,7 @@ func TestMain(m *testing.M) {
 func BenchmarkNet(b *testing.B) {
 	dev := startServer()
 	defer dev.Close()
+	defer time.Sleep(time.Second) // todo fix
 	dev2, tnet := startClient()
 	defer dev2.Close()
 

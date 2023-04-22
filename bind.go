@@ -1,35 +1,30 @@
 package wgortc
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"net"
-	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/donovanhide/eventsource"
 	"github.com/lainio/err2"
 	"github.com/lainio/err2/try"
 	"github.com/pion/ice/v2"
 	"github.com/pion/webrtc/v3"
 	"github.com/shynome/wgortc/mux"
+	"github.com/shynome/wgortc/signaler"
 	"golang.zx2c4.com/wireguard/conn"
 )
 
 type Bind struct {
 	id       string
-	signaler *signaler
+	signaler signaler.Channel
 
 	pcs  []*webrtc.PeerConnection
 	pcsL sync.Locker
 
 	api *webrtc.API
 	mux ice.UDPMux
-
-	connectionStream *eventsource.Stream
 
 	ICEServers []webrtc.ICEServer
 
@@ -40,10 +35,10 @@ type Bind struct {
 
 var _ conn.Bind = (*Bind)(nil)
 
-func NewBind(id string, signaler string) *Bind {
+func NewBind(id string, signaler signaler.Channel) *Bind {
 	return &Bind{
 		id:       id,
-		signaler: newSignaler(signaler),
+		signaler: signaler,
 
 		pcsL: &sync.Mutex{},
 
@@ -66,10 +61,9 @@ func (b *Bind) Open(port uint16) (fns []conn.ReceiveFunc, actualPort uint16, err
 	}
 	b.api = webrtc.NewAPI(webrtc.WithSettingEngine(settingEngine))
 
-	req := try.To1(b.signaler.newReq(http.MethodGet, b.id, http.NoBody))
-	b.connectionStream = try.To1(eventsource.SubscribeWithRequest("", req))
+	ch := try.To1(b.signaler.Accept())
 	go func() {
-		for ev := range b.connectionStream.Events {
+		for ev := range ch {
 			go b.handleConnect(ev)
 		}
 	}()
@@ -111,7 +105,7 @@ func (b *Bind) receiveMsg(ep conn.Endpoint) func(msg webrtc.DataChannelMessage) 
 	}
 }
 
-func (b *Bind) handleConnect(ev eventsource.Event) {
+func (b *Bind) handleConnect(sess signaler.Session) {
 	var pc *webrtc.PeerConnection
 	defer err2.Catch(func(err error) {
 		if pc != nil {
@@ -119,12 +113,7 @@ func (b *Bind) handleConnect(ev eventsource.Event) {
 		}
 	})
 
-	var offer webrtc.SessionDescription
-	try.To(json.Unmarshal([]byte(ev.Data()), &offer))
-	sdp := try.To1(offer.Unmarshal())
-	if sdp.Origin.Username == "" {
-		return
-	}
+	var offer = sess.Description()
 
 	config := webrtc.Configuration{
 		ICEServers: b.ICEServers,
@@ -133,7 +122,7 @@ func (b *Bind) handleConnect(ev eventsource.Event) {
 	pc.OnDataChannel(func(dc *webrtc.DataChannel) {
 		switch dc.Label() {
 		case "wgortc":
-			ep := b.NewEndpoint(sdp.Origin.Username)
+			ep := b.NewEndpoint(offer.SDP)
 			ep.init.Do(func() {
 				ep.dc = dc
 				ep.dsiableReconnect = true
@@ -182,10 +171,7 @@ func (b *Bind) handleConnect(ev eventsource.Event) {
 	<-gatherComplete
 	roffer := pc.LocalDescription()
 
-	body := try.To1(json.Marshal(roffer))
-	req := try.To1(b.signaler.newReq(http.MethodDelete, b.id, bytes.NewReader(body)))
-	req.Header.Set("X-Event-Id", ev.Id())
-	try.To1(b.signaler.doReq(req))
+	try.To(sess.Resolve(roffer))
 
 	return
 }
@@ -213,8 +199,8 @@ func (b *Bind) Close() (err error) {
 	if b.mux != nil {
 		try.To(b.mux.Close())
 	}
-	if b.connectionStream != nil {
-		b.connectionStream.Close()
+	if b.signaler != nil {
+		try.To(b.signaler.Close())
 	}
 	if b.msgCh != nil {
 		close(b.msgCh)

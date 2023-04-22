@@ -1,10 +1,7 @@
 package wgortc
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
-	"net/http"
 	"net/netip"
 	"sync"
 	"time"
@@ -74,17 +71,9 @@ func (ep *Endpoint) connect() {
 	try.To(pc.SetLocalDescription(offer))
 	offer = *pc.LocalDescription()
 
-	sdp := try.To1(offer.Unmarshal())
-	sdp.Origin.Username = b.id
-	offer.SDP = string(try.To1(sdp.Marshal()))
+	roffer := try.To1(b.signaler.Handshake(ep.id, offer))
 
-	body := try.To1(json.Marshal(offer))
-	req := try.To1(b.signaler.newReq(http.MethodPost, ep.id, bytes.NewReader(body)))
-	res := try.To1(b.signaler.doReq(req))
-
-	var roffer webrtc.SessionDescription
-	try.To(json.NewDecoder(res.Body).Decode(&roffer))
-	try.To(pc.SetRemoteDescription(roffer))
+	try.To(pc.SetRemoteDescription(*roffer))
 
 	try.To(waitDC(dc, 5*time.Second))
 	ep.dc = dc
