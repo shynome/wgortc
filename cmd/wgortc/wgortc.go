@@ -7,6 +7,7 @@ import (
 
 	"github.com/lainio/err2/try"
 	"github.com/shynome/wgortc"
+	"github.com/shynome/wgortc/signaler/lens2"
 	"golang.zx2c4.com/wireguard/device"
 	"golang.zx2c4.com/wireguard/ipc"
 	"golang.zx2c4.com/wireguard/tun"
@@ -26,7 +27,8 @@ func main() {
 	}
 
 	tdev := try.To1(tun.CreateTUN(*tdevn, device.DefaultMTU))
-	bind := wgortc.NewBind(*id, *signaler)
+	wrtcSignaler := lens2.NewSignaler(*id, *signaler)
+	bind := wgortc.NewBind(wrtcSignaler)
 	logger := device.NewLogger(*loglevel, *id)
 	dev := device.NewDevice(tdev, bind, logger)
 
