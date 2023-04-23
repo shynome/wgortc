@@ -5,19 +5,19 @@ import (
 	"net"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/lainio/err2"
 	"github.com/lainio/err2/try"
 	"github.com/pion/ice/v2"
 	"github.com/pion/webrtc/v3"
+	"github.com/shynome/wgortc/endpoint"
 	"github.com/shynome/wgortc/mux"
 	"github.com/shynome/wgortc/signaler"
 	"golang.zx2c4.com/wireguard/conn"
 )
 
 type Bind struct {
-	signaler signaler.Channel
+	signaler.Channel
 
 	pcs  []*webrtc.PeerConnection
 	pcsL sync.Locker
@@ -36,7 +36,7 @@ var _ conn.Bind = (*Bind)(nil)
 
 func NewBind(signaler signaler.Channel) *Bind {
 	return &Bind{
-		signaler: signaler,
+		Channel: signaler,
 
 		pcsL: &sync.Mutex{},
 
@@ -59,7 +59,7 @@ func (b *Bind) Open(port uint16) (fns []conn.ReceiveFunc, actualPort uint16, err
 	}
 	b.api = webrtc.NewAPI(webrtc.WithSettingEngine(settingEngine))
 
-	ch := try.To1(b.signaler.Accept())
+	ch := try.To1(b.Accept())
 	go func() {
 		for ev := range ch {
 			go b.handleConnect(ev)
@@ -71,7 +71,7 @@ func (b *Bind) Open(port uint16) (fns []conn.ReceiveFunc, actualPort uint16, err
 }
 
 type packetMsg struct {
-	data *[]byte
+	data []byte
 	ep   conn.Endpoint
 }
 
@@ -84,7 +84,7 @@ func (b *Bind) receiveFunc(packets [][]byte, sizes []int, eps []conn.Endpoint) (
 		if !ok {
 			return 0, net.ErrClosed
 		}
-		sizes[i] = copy(packets[i], *msg.data)
+		sizes[i] = copy(packets[i], msg.data)
 		eps[i] = msg.ep
 		n += 1
 	}
@@ -97,79 +97,35 @@ func (b *Bind) receiveMsg(ep conn.Endpoint) func(msg webrtc.DataChannelMessage) 
 			return
 		}
 		b.msgCh <- packetMsg{
-			data: &msg.Data,
+			data: msg.Data,
 			ep:   ep,
 		}
 	}
 }
 
 func (b *Bind) handleConnect(sess signaler.Session) {
-	var pc *webrtc.PeerConnection
-	defer err2.Catch(func(err error) {
-		if pc != nil {
-			pc.Close()
-		}
-	})
-
-	var offer = sess.Description()
+	defer err2.Catch()
 
 	config := webrtc.Configuration{
 		ICEServers: b.ICEServers,
 	}
-	pc = try.To1(b.api.NewPeerConnection(config))
-	pc.OnDataChannel(func(dc *webrtc.DataChannel) {
-		switch dc.Label() {
-		case "wgortc":
-			ep := b.NewEndpoint(offer.SDP)
-			ep.init.Do(func() {
-				ep.dc = dc
-				ep.dsiableReconnect = true
-			})
-			dc.OnMessage(b.receiveMsg(ep))
-		case "alive":
-			go func() {
-				t := time.NewTimer(10 * time.Second)
-				defer func() {
-					<-t.C
-					pc.Close()
-				}()
-				// recive "ping" every 3s
-				dc.OnMessage(func(msg webrtc.DataChannelMessage) {
-					dc.SendText("pong")
-					t.Reset(10 * time.Second)
-				})
-				dc.OnClose(func() {
-					t.Stop()
-				})
-			}()
-		}
-	})
-	var i int = -1
-	pc.OnConnectionStateChange(func(pcs webrtc.PeerConnectionState) {
-		switch pcs {
-		case webrtc.PeerConnectionStateConnected:
-			b.pcsL.Lock()
-			defer b.pcsL.Unlock()
-			i = len(b.pcs)
-			b.pcs = append(b.pcs, pc)
-		case webrtc.PeerConnectionStateClosed:
-			if i < 0 {
-				return
-			}
-			b.pcsL.Lock()
-			defer b.pcsL.Unlock()
-			b.pcs[i] = nil
-		}
-	})
+	pc := try.To1(b.api.NewPeerConnection(config))
+	defer pc.Close()
 
-	try.To(pc.SetRemoteDescription(offer))
-	answer := try.To1(pc.CreateAnswer(nil))
-	gatherComplete := webrtc.GatheringCompletePromise(pc)
-	try.To(pc.SetLocalDescription(answer))
-	<-gatherComplete
-	roffer := pc.LocalDescription()
+	inbound := endpoint.NewInbound(sess, pc)
+	initiator := try.To1(inbound.ExtractInitiator())
+	b.msgCh <- packetMsg{
+		data: initiator,
+		ep:   inbound,
+	}
 
-	try.To(sess.Resolve(roffer))
+	ch := inbound.Message()
+	for d := range ch {
+		b.msgCh <- packetMsg{
+			data: d,
+			ep:   inbound,
+		}
+	}
 
 	return
 }
@@ -197,8 +153,8 @@ func (b *Bind) Close() (err error) {
 	if b.mux != nil {
 		try.To(b.mux.Close())
 	}
-	if b.signaler != nil {
-		try.To(b.signaler.Close())
+	if b.Channel != nil {
+		try.To(b.Channel.Close())
 	}
 	if b.msgCh != nil {
 		close(b.msgCh)
@@ -207,14 +163,31 @@ func (b *Bind) Close() (err error) {
 }
 
 func (b *Bind) ParseEndpoint(s string) (ep conn.Endpoint, err error) {
-	return b.NewEndpoint(s), nil
+	outbound := endpoint.NewOutbound(s, b)
+	go func() {
+		ch := outbound.Message()
+		for d := range ch {
+			b.msgCh <- packetMsg{
+				data: d,
+				ep:   outbound,
+			}
+		}
+	}()
+	return outbound, nil
+}
+
+var _ endpoint.Hub = (*Bind)(nil)
+
+func (b *Bind) NewPeerConnection() (*webrtc.PeerConnection, error) {
+	config := webrtc.Configuration{}
+	return b.api.NewPeerConnection(config)
 }
 
 func (b *Bind) Send(bufs [][]byte, ep conn.Endpoint) (err error) {
 	if b.isClosed() {
 		return net.ErrClosed
 	}
-	sender, ok := ep.(*Endpoint)
+	sender, ok := ep.(endpoint.Sender)
 	if !ok {
 		return ErrEndpointImpl
 	}
