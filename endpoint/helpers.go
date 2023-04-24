@@ -32,8 +32,8 @@ func WaitDC(dc *webrtc.DataChannel, timeout time.Duration) (err error) {
 	dc.OnOpen(func() {
 		cancelWith(nil)
 	})
-	dc.OnError(func(err error) {
-		cancelWith(err)
+	dc.OnClose(func() {
+		cancelWith(ErrDataChannelClosed)
 	})
 
 	<-ctx.Done()
