@@ -29,16 +29,18 @@ func TestClient(t *testing.T) {
 	if !debug {
 		return
 	}
-	dev, _ := startClient(debugHub)
+	dev, tnet := startClient(debugHub)
 	defer dev.Close()
+	httpGet(tnet)
 }
 
 func TestNet(t *testing.T) {
 	hub := local.NewHub()
 	dev := startServer(hub)
 	defer dev.Close()
-	dev2, _ := startClient(hub)
+	dev2, tnet := startClient(hub)
 	defer dev2.Close()
+	httpGet(tnet)
 }
 
 func TestReconnect(t *testing.T) {
@@ -47,15 +49,13 @@ func TestReconnect(t *testing.T) {
 	dev := startServer(hub)
 	dev2, tnet := startClient(hub)
 	defer dev2.Close()
+	httpGet(tnet)
 
 	dev.Close()
 	dev = startServer(hub)
 	defer dev.Close()
 
-	client := http.Client{Transport: &http.Transport{DialContext: tnet.DialContext}}
-	resp := try.To1(client.Get("http://192.168.4.29/"))
-	body := try.To1(io.ReadAll(resp.Body))
-	t.Log(string(body))
+	httpGet(tnet)
 
 }
 

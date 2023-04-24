@@ -25,14 +25,7 @@ func main() {
 	dev2, tnet := startClient(hub)
 	defer dev2.Close()
 
-	client := http.Client{
-		Transport: &http.Transport{
-			DialContext: tnet.DialContext,
-		},
-	}
-	resp := try.To1(client.Get("http://192.168.4.29/"))
-	body := try.To1(io.ReadAll(resp.Body))
-	log.Println(string(body))
+	httpGet(tnet)
 }
 
 var loglevel = device.LogLevelVerbose
@@ -87,4 +80,15 @@ endpoint=server
 	try.To(dev.Up())
 
 	return
+}
+
+func httpGet(tnet *netstack.Net) {
+	client := http.Client{
+		Transport: &http.Transport{
+			DialContext: tnet.DialContext,
+		},
+	}
+	resp := try.To1(client.Get("http://192.168.4.29/"))
+	body := try.To1(io.ReadAll(resp.Body))
+	log.Println(string(body))
 }
