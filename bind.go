@@ -4,7 +4,6 @@ import (
 	"errors"
 	"net"
 	"sync"
-	"sync/atomic"
 
 	"github.com/lainio/err2"
 	"github.com/lainio/err2/try"
@@ -29,7 +28,8 @@ type Bind struct {
 
 	msgCh chan packetMsg
 
-	closed uint32
+	closed bool
+	locker *sync.RWMutex
 }
 
 var _ conn.Bind = (*Bind)(nil)
@@ -40,12 +40,15 @@ func NewBind(signaler signaler.Channel) *Bind {
 
 		pcsL: &sync.Mutex{},
 
-		closed: 0,
+		closed: false,
+		locker: &sync.RWMutex{},
 	}
 }
 
 func (b *Bind) Open(port uint16) (fns []conn.ReceiveFunc, actualPort uint16, err error) {
 	defer err2.Handle(&err)
+	b.locker.Lock()
+	defer b.locker.Unlock()
 
 	fns = append(fns, b.receiveFunc)
 
@@ -66,7 +69,7 @@ func (b *Bind) Open(port uint16) (fns []conn.ReceiveFunc, actualPort uint16, err
 		}
 	}()
 
-	atomic.StoreUint32(&b.closed, 0)
+	b.closed = false
 	return
 }
 
@@ -91,18 +94,6 @@ func (b *Bind) receiveFunc(packets [][]byte, sizes []int, eps []conn.Endpoint) (
 	return
 }
 
-func (b *Bind) receiveMsg(ep conn.Endpoint) func(msg webrtc.DataChannelMessage) {
-	return func(msg webrtc.DataChannelMessage) {
-		if b.isClosed() {
-			return
-		}
-		b.msgCh <- packetMsg{
-			data: msg.Data,
-			ep:   ep,
-		}
-	}
-}
-
 func (b *Bind) handleConnect(sess signaler.Session) {
 	defer err2.Catch()
 
@@ -121,6 +112,9 @@ func (b *Bind) handleConnect(sess signaler.Session) {
 
 	ch := inbound.Message()
 	for d := range ch {
+		if b.isClosed() {
+			break
+		}
 		b.msgCh <- packetMsg{
 			data: d,
 			ep:   inbound,
@@ -131,13 +125,18 @@ func (b *Bind) handleConnect(sess signaler.Session) {
 }
 
 func (b *Bind) isClosed() bool {
-	return atomic.LoadUint32(&b.closed) != 0
+	b.locker.RLock()
+	defer b.locker.RUnlock()
+	return b.closed
 }
 
 func (b *Bind) Close() (err error) {
 	defer err2.Handle(&err)
 
-	atomic.StoreUint32(&b.closed, 1)
+	b.locker.Lock()
+	defer b.locker.Unlock()
+
+	b.closed = true
 
 	if len(b.pcs) > 0 {
 		func() {
@@ -167,6 +166,9 @@ func (b *Bind) ParseEndpoint(s string) (ep conn.Endpoint, err error) {
 	go func() {
 		ch := outbound.Message()
 		for d := range ch {
+			if b.isClosed() {
+				break
+			}
 			b.msgCh <- packetMsg{
 				data: d,
 				ep:   outbound,
