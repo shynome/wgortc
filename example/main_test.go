@@ -11,14 +11,17 @@ import (
 
 	"github.com/lainio/err2"
 	"github.com/lainio/err2/try"
+	"github.com/shynome/wgortc/signaler/local"
 	"golang.zx2c4.com/wireguard/device"
 )
+
+var debugHub = local.NewHub()
 
 func TestServer(t *testing.T) {
 	if !debug {
 		return
 	}
-	dev := startServer()
+	dev := startServer(debugHub)
 	<-dev.Wait()
 }
 
@@ -26,24 +29,27 @@ func TestClient(t *testing.T) {
 	if !debug {
 		return
 	}
-	dev, _ := startClient()
+	dev, _ := startClient(debugHub)
 	defer dev.Close()
 }
 
 func TestNet(t *testing.T) {
-	dev := startServer()
+	hub := local.NewHub()
+	dev := startServer(hub)
 	defer dev.Close()
-	dev2, _ := startClient()
+	dev2, _ := startClient(hub)
 	defer dev2.Close()
 }
 
 func TestReconnect(t *testing.T) {
-	dev := startServer()
-	dev2, tnet := startClient()
+	hub := local.NewHub()
+
+	dev := startServer(hub)
+	dev2, tnet := startClient(hub)
 	defer dev2.Close()
 
 	dev.Close()
-	dev = startServer()
+	dev = startServer(hub)
 	defer dev.Close()
 
 	client := http.Client{Transport: &http.Transport{DialContext: tnet.DialContext}}
@@ -54,7 +60,8 @@ func TestReconnect(t *testing.T) {
 }
 
 func TestDevClose(t *testing.T) {
-	dev := startServer()
+	hub := local.NewHub()
+	dev := startServer(hub)
 	// time.Sleep(time.Second * 5)
 	dev.Close()
 }
@@ -70,10 +77,11 @@ func TestMain(m *testing.M) {
 }
 
 func BenchmarkNet(b *testing.B) {
-	dev := startServer()
+	hub := local.NewHub()
+	dev := startServer(hub)
 	defer dev.Close()
 	defer time.Sleep(time.Second) // todo fix
-	dev2, tnet := startClient()
+	dev2, tnet := startClient(hub)
 	defer dev2.Close()
 
 	client := http.Client{
