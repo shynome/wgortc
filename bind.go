@@ -18,9 +18,6 @@ import (
 type Bind struct {
 	signaler.Channel
 
-	pcs  []*webrtc.PeerConnection
-	pcsL sync.Locker
-
 	api *webrtc.API
 	mux ice.UDPMux
 
@@ -38,8 +35,6 @@ func NewBind(signaler signaler.Channel) *Bind {
 	return &Bind{
 		Channel: signaler,
 
-		pcsL: &sync.Mutex{},
-
 		closed: false,
 		locker: &sync.RWMutex{},
 	}
@@ -53,7 +48,6 @@ func (b *Bind) Open(port uint16) (fns []conn.ReceiveFunc, actualPort uint16, err
 	fns = append(fns, b.receiveFunc)
 
 	b.msgCh = make(chan packetMsg, b.BatchSize()-1)
-	b.pcs = make([]*webrtc.PeerConnection, 0)
 
 	settingEngine := webrtc.SettingEngine{}
 	if mux.WithUDPMux != nil {
@@ -138,17 +132,6 @@ func (b *Bind) Close() (err error) {
 
 	b.closed = true
 
-	if len(b.pcs) > 0 {
-		func() {
-			b.pcsL.Lock()
-			defer b.pcsL.Unlock()
-			for _, pc := range b.pcs {
-				if pc != nil {
-					try.To(pc.Close())
-				}
-			}
-		}()
-	}
 	if b.mux != nil {
 		try.To(b.mux.Close())
 	}
