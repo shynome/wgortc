@@ -5,8 +5,11 @@
 replace `conn.Bind` with this. more details see [example/main.go](./example/main.go)
 
 ```go
-	// the signaler server is only for test
-	signaler := lens2.NewSignaler("client", "https://test:test@signaler.slive.fun")
+    // local signaler hub
+	hub := local.NewHub()
+	// client signaler, you can impl a custom signaler by youself
+    signaler := local.NewServer()
+	hub.Register("client", signaler)
 	bind := wgortc.NewBind(signaler)
 	dev = device.NewDevice(tun, bind, device.NewLogger(loglevel, "client"))
 ```
