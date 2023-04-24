@@ -5,10 +5,10 @@
 replace `conn.Bind` with this. more details see [example/main.go](./example/main.go)
 
 ```go
-    // local signaler hub
+	// local signaler hub
 	hub := local.NewHub()
 	// client signaler, you can impl a custom signaler by youself
-    signaler := local.NewServer()
+	signaler := local.NewServer()
 	hub.Register("client", signaler)
 	bind := wgortc.NewBind(signaler)
 	dev = device.NewDevice(tun, bind, device.NewLogger(loglevel, "client"))
