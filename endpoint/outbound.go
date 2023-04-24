@@ -44,6 +44,7 @@ func NewOutbound(id string, hub Hub) *Outbound {
 }
 
 func (ep *Outbound) Send(buf []byte) (err error) {
+	defer ep.resetWhenWrong(&err)
 	var sended = false
 	ep.init.Do(func() {
 		ep.Connect(buf)
@@ -58,7 +59,15 @@ func (ep *Outbound) Send(buf []byte) (err error) {
 	return ep.dc.Send(buf)
 }
 
+func (ep *Outbound) resetWhenWrong(err *error) {
+	if *err == nil {
+		return
+	}
+	ep.init = &sync.Once{}
+}
+
 func (ep *Outbound) Connect(buf []byte) {
+	ep.err = nil
 	defer err2.Catch(func(err error) {
 		ep.err = err
 	})
@@ -77,8 +86,17 @@ func (ep *Outbound) Connect(buf []byte) {
 	}
 	dc := try.To1(pc.CreateDataChannel("wgortc", &dcinit))
 	ep.dc = dc
+	t := time.AfterFunc(10*time.Second, func() {
+		// 10s 后未接收到信息就关闭掉连接
+		pc.Close()
+		ep.init = &sync.Once{}
+	})
 	dc.OnMessage(func(msg webrtc.DataChannelMessage) {
 		ep.ch <- msg.Data
+		go t.Reset(10 * time.Second)
+	})
+	dc.OnClose(func() {
+		t.Stop()
 	})
 
 	offer := try.To1(pc.CreateOffer(nil))
