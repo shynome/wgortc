@@ -35,3 +35,28 @@ type Session interface {
 	Reject(err error)
 }
 ```
+
+## 如何建立连接
+
+```mermaid
+sequenceDiagram
+    participant client
+    participant server
+    par first message packet
+        client->>server: webrtc session description
+    and
+        client->>server: wireguard initiator message
+    end
+    Note over server,client: server wireguard check initiator
+    critical check failed
+        server--)client: close connection
+    option check ok
+        server->>client: webrtc session description
+        server->>client: wiregaurd response initiator
+    		server->>client: webrtc pair connect
+    end
+    Note over server,client: webrtc connected
+    loop webrtc datachannel open
+        server->client: wireguard exchange data
+    end
+```
