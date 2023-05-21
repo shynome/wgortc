@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.0.2]
+
+- [x] endpoint return a fake addr for compat wg show
+
 ## [0.0.1]
 
 - [x] close PeerConnection if it long time no packet send
