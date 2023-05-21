@@ -20,7 +20,7 @@ var _ conn.Endpoint = (*baseEndpoint)(nil)
 func (ep *baseEndpoint) DstToBytes() []byte {
 	return []byte(ep.id)
 }
-func (ep *baseEndpoint) DstToString() string { return ep.id } // returns the destination address (ip:port)
+func (ep *baseEndpoint) DstToString() string { return "[fdd9:f800::]:80" } // returns the destination address (ip:port)
 
 func (*baseEndpoint) ClearSrc()           {}            // clears the source address
 func (*baseEndpoint) SrcToString() string { return "" } // returns the local source address (ip:port)
