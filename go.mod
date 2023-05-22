@@ -3,7 +3,6 @@ module github.com/shynome/wgortc
 go 1.20
 
 require (
-	github.com/donovanhide/eventsource v0.0.0-20210830082556-c59027999da0
 	github.com/lainio/err2 v0.9.0
 	github.com/pion/ice/v2 v2.3.2
 	github.com/pion/sdp/v3 v3.0.6
