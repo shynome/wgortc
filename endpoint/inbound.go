@@ -86,16 +86,8 @@ func (ep *Inbound) HandleConnect() {
 		case "wgortc":
 			defer cause(nil)
 			ep.dc = dc
-			t := time.AfterFunc(10*time.Second, func() {
-				// 10s 后未接收到信息就关闭掉连接
-				pc.Close()
-			})
 			dc.OnMessage(func(msg webrtc.DataChannelMessage) {
 				ep.ch <- msg.Data
-				go t.Reset(10 * time.Second)
-			})
-			dc.OnClose(func() {
-				t.Stop()
 			})
 		}
 	})

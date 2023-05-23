@@ -2,7 +2,6 @@ package endpoint
 
 import (
 	"encoding/base64"
-	"sync"
 	"time"
 
 	"github.com/lainio/err2"
@@ -15,12 +14,10 @@ import (
 
 type Outbound struct {
 	baseEndpoint
-	pc   *webrtc.PeerConnection
-	dc   *webrtc.DataChannel
-	init *sync.Once
-	err  error
-	hub  Hub
-	ch   chan []byte
+	pc  *webrtc.PeerConnection
+	dc  *webrtc.DataChannel
+	hub Hub
+	ch  chan []byte
 }
 
 var (
@@ -37,40 +34,20 @@ func NewOutbound(id string, hub Hub) *Outbound {
 	return &Outbound{
 		baseEndpoint: baseEndpoint{id: id},
 
-		hub:  hub,
-		init: &sync.Once{},
-		ch:   make(chan []byte),
+		hub: hub,
+		ch:  make(chan []byte),
 	}
 }
 
 func (ep *Outbound) Send(buf []byte) (err error) {
-	defer ep.resetWhenWrong(&err)
-	var sended = false
-	ep.init.Do(func() {
-		ep.Connect(buf)
-		sended = true
-	})
-	if ep.err != nil {
-		return ep.err
-	}
-	if sended { // first initiator message send with webrtc
-		return
+	if buf[0] == 1 {
+		return ep.Connect(buf)
 	}
 	return ep.dc.Send(buf)
 }
 
-func (ep *Outbound) resetWhenWrong(err *error) {
-	if *err == nil {
-		return
-	}
-	ep.init = &sync.Once{}
-}
-
-func (ep *Outbound) Connect(buf []byte) {
-	ep.err = nil
-	defer err2.Catch(func(err error) {
-		ep.err = err
-	})
+func (ep *Outbound) Connect(buf []byte) (err error) {
+	defer err2.Handle(&err)
 
 	var pc *webrtc.PeerConnection = ep.pc
 	if pc != nil {
@@ -86,17 +63,9 @@ func (ep *Outbound) Connect(buf []byte) {
 	}
 	dc := try.To1(pc.CreateDataChannel("wgortc", &dcinit))
 	ep.dc = dc
-	t := time.AfterFunc(10*time.Second, func() {
-		// 10s 后未接收到信息就关闭掉连接
-		pc.Close()
-		ep.init = &sync.Once{}
-	})
+
 	dc.OnMessage(func(msg webrtc.DataChannelMessage) {
 		ep.ch <- msg.Data
-		go t.Reset(10 * time.Second)
-	})
-	dc.OnClose(func() {
-		t.Stop()
 	})
 
 	offer := try.To1(pc.CreateOffer(nil))
