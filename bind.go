@@ -164,7 +164,9 @@ func (b *Bind) ParseEndpoint(s string) (ep conn.Endpoint, err error) {
 var _ endpoint.Hub = (*Bind)(nil)
 
 func (b *Bind) NewPeerConnection() (*webrtc.PeerConnection, error) {
-	config := webrtc.Configuration{}
+	config := webrtc.Configuration{
+		ICEServers: b.ICEServers,
+	}
 	return b.api.NewPeerConnection(config)
 }
 
