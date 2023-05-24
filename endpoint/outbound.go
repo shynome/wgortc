@@ -68,8 +68,10 @@ func (ep *Outbound) Connect(buf []byte) (err error) {
 		ep.ch <- msg.Data
 	})
 
+	gatherComplete := webrtc.GatheringCompletePromise(pc)
 	offer := try.To1(pc.CreateOffer(nil))
 	try.To(pc.SetLocalDescription(offer))
+	<-gatherComplete
 	offer = *pc.LocalDescription()
 
 	initiator := sdp.Information(base64.StdEncoding.EncodeToString(buf))
