@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
-	"sync"
+	"net"
 	"time"
 
 	"github.com/lainio/err2"
 	"github.com/lainio/err2/try"
+	"github.com/pion/sdp/v3"
 	"github.com/pion/webrtc/v3"
 	"github.com/shynome/wgortc/signaler"
 	"golang.zx2c4.com/wireguard/conn"
@@ -19,10 +20,8 @@ type Inbound struct {
 	dc   *webrtc.DataChannel
 	sess signaler.Session
 
-	init *sync.Once
-	err  error
-	pc   *webrtc.PeerConnection
-	ch   chan []byte
+	pc *webrtc.PeerConnection
+	ch chan []byte
 }
 
 var (
@@ -37,17 +36,27 @@ func NewInbound(sess signaler.Session, pc *webrtc.PeerConnection) *Inbound {
 		},
 		pc:   pc,
 		sess: sess,
-		init: &sync.Once{},
 		ch:   make(chan []byte),
 	}
 }
 
-func (ep *Inbound) Send(buf []byte) error {
-	ep.init.Do(ep.HandleConnect)
-	if ep.err != nil {
-		return ep.err
+func (ep *Inbound) Send(buf []byte) (err error) {
+	if buf[0] == 2 && ep.dcIsClosed() {
+		go ep.HandleConnect(buf)
+		return
 	}
-	return ep.dc.Send(buf)
+	if ep.dc.ReadyState() != webrtc.DataChannelStateOpen {
+		return net.ErrClosed
+	}
+	go ep.dc.Send(buf)
+	return
+}
+
+func (ep *Inbound) dcIsClosed() bool {
+	if ep.dc == nil {
+		return true
+	}
+	return ep.dc.ReadyState() != webrtc.DataChannelStateOpen
 }
 
 func (ep *Inbound) ExtractInitiator() (initiator []byte, err error) {
@@ -62,10 +71,9 @@ func (ep *Inbound) ExtractInitiator() (initiator []byte, err error) {
 	return initiator, nil
 }
 
-func (ep *Inbound) HandleConnect() {
-	defer err2.Catch(func(err error) {
-		defer ep.sess.Reject(err)
-		ep.err = err
+func (ep *Inbound) HandleConnect(buf []byte) (err error) {
+	defer err2.Handle(&err, func() {
+		ep.sess.Reject(err)
 	})
 
 	pc := ep.pc
@@ -75,6 +83,11 @@ func (ep *Inbound) HandleConnect() {
 	try.To(pc.SetLocalDescription(answer))
 	<-gatherComplete
 	roffer := pc.LocalDescription()
+
+	responder := sdp.Information(base64.StdEncoding.EncodeToString(buf))
+	sdp := try.To1(roffer.Unmarshal())
+	sdp.SessionInformation = &responder
+	roffer.SDP = string(try.To1(sdp.Marshal()))
 
 	try.To(ep.sess.Resolve(roffer))
 
@@ -95,6 +108,8 @@ func (ep *Inbound) HandleConnect() {
 	if err := context.Cause(ctx); err != context.Canceled {
 		try.To(err)
 	}
+
+	return
 }
 
 func (ep *Inbound) Message() (ch <-chan []byte) {

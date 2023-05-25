@@ -2,6 +2,8 @@ package endpoint
 
 import (
 	"encoding/base64"
+	"errors"
+	"net"
 	"time"
 
 	"github.com/lainio/err2"
@@ -40,10 +42,22 @@ func NewOutbound(id string, hub Hub) *Outbound {
 }
 
 func (ep *Outbound) Send(buf []byte) (err error) {
-	if buf[0] == 1 {
-		return ep.Connect(buf)
+	if buf[0] == 1 && ep.dcIsClosed() {
+		go ep.Connect(buf)
+		return
 	}
-	return ep.dc.Send(buf)
+	if ep.dc.ReadyState() != webrtc.DataChannelStateOpen {
+		return net.ErrClosed
+	}
+	go ep.dc.Send(buf)
+	return
+}
+
+func (ep *Outbound) dcIsClosed() bool {
+	if ep.dc == nil {
+		return true
+	}
+	return ep.dc.ReadyState() != webrtc.DataChannelStateOpen
 }
 
 func (ep *Outbound) Connect(buf []byte) (err error) {
@@ -83,10 +97,19 @@ func (ep *Outbound) Connect(buf []byte) (err error) {
 
 	try.To(pc.SetRemoteDescription(*anwser))
 
+	sdp2 := try.To1(anwser.Unmarshal())
+	if sdp2.SessionInformation == nil {
+		return ErrInitiatorResponderRequired
+	}
+	responder := try.To1(base64.StdEncoding.DecodeString(string(*sdp2.SessionInformation)))
+
 	try.To(WaitDC(dc, 5*time.Second))
+	ep.ch <- responder
 
 	return
 }
+
+var ErrInitiatorResponderRequired = errors.New("first message initiator responder is required in webrtc sdp SessionInformation")
 
 func (ep *Outbound) Close() (err error) {
 	if pc := ep.pc; pc != nil {
