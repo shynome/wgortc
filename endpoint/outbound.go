@@ -72,6 +72,13 @@ func (ep *Outbound) Connect(buf []byte) (err error) {
 	pc = try.To1(ep.hub.NewPeerConnection())
 	ep.pc = pc
 
+	pc.OnConnectionStateChange(func(pcs webrtc.PeerConnectionState) {
+		switch pcs {
+		case webrtc.PeerConnectionStateDisconnected:
+			pc.Close()
+		}
+	})
+
 	dcinit := webrtc.DataChannelInit{
 		Ordered:        refVal(false),
 		MaxRetransmits: refVal(uint16(0)),

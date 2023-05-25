@@ -78,6 +78,13 @@ func (ep *Inbound) HandleConnect(buf []byte) (err error) {
 	})
 
 	pc := ep.pc
+	pc.OnConnectionStateChange(func(pcs webrtc.PeerConnectionState) {
+		switch pcs {
+		case webrtc.PeerConnectionStateDisconnected:
+			pc.Close()
+		}
+	})
+
 	try.To(pc.SetRemoteDescription(ep.sess.Description()))
 	answer := try.To1(pc.CreateAnswer(nil))
 	gatherComplete := webrtc.GatheringCompletePromise(pc)
