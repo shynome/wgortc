@@ -26,7 +26,7 @@ func (s *Server) Handshake(endpoint string, offer signaler.SDP) (answer *signale
 	}
 	remote := s.hub.Find(endpoint)
 	if remote == nil {
-		return nil, fmt.Errorf("server is not found.")
+		return nil, fmt.Errorf("server is not found. ep: %s", endpoint)
 	}
 	if remote.ch == nil {
 		return nil, fmt.Errorf("server is not ready accept")
