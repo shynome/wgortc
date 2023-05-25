@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.0.6]
+
+### Fix
+
+- ep.dc maybe is nil, now have a check
+
 ## [0.0.5]
 
 ### Change
