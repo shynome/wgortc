@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.0.8]
+
+### Fix
+
+- GetSelectedCandidatePair also maybe return nil, add a check
+
 ## [0.0.7]
 
 ### Change
