@@ -51,6 +51,9 @@ func getPCRemote(pc *webrtc.PeerConnection) (addr string) {
 	if err != nil {
 		return "[fdd9:f800::1]:80"
 	}
+	if pair == nil {
+		return
+	}
 	remote := pair.Remote
 	if remote == nil {
 		return "[fdd9:f800::2]:80"
