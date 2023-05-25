@@ -41,11 +41,12 @@ func NewInbound(sess signaler.Session, pc *webrtc.PeerConnection) *Inbound {
 }
 
 func (ep *Inbound) Send(buf []byte) (err error) {
-	if buf[0] == 2 && ep.dcIsClosed() {
+	closed := ep.dcIsClosed()
+	if buf[0] == 2 && closed {
 		go ep.HandleConnect(buf)
 		return
 	}
-	if ep.dc.ReadyState() != webrtc.DataChannelStateOpen {
+	if closed {
 		return net.ErrClosed
 	}
 	go ep.dc.Send(buf)

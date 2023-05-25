@@ -42,11 +42,12 @@ func NewOutbound(id string, hub Hub) *Outbound {
 }
 
 func (ep *Outbound) Send(buf []byte) (err error) {
-	if buf[0] == 1 && ep.dcIsClosed() {
+	closed := ep.dcIsClosed()
+	if buf[0] == 1 && closed {
 		go ep.Connect(buf)
 		return
 	}
-	if ep.dc.ReadyState() != webrtc.DataChannelStateOpen {
+	if closed {
 		return net.ErrClosed
 	}
 	go ep.dc.Send(buf)
