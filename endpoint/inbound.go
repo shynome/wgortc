@@ -118,3 +118,7 @@ func (ep *Inbound) Message() (ch <-chan []byte) {
 }
 
 var ErrInitiatorRequired = errors.New("first message initiator is required in webrtc sdp SessionInformation")
+
+func (ep *Inbound) DstToString() string {
+	return getPCRemote(ep.pc)
+}

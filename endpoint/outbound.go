@@ -124,3 +124,7 @@ func (ep *Outbound) Close() (err error) {
 func (ep *Outbound) Message() (ch <-chan []byte) {
 	return ep.ch
 }
+
+func (ep *Outbound) DstToString() string {
+	return getPCRemote(ep.pc)
+}
