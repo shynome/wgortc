@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.0.7]
+
+### Change
+
+- DstToString now export webrtc remote pair ip:port
+
 ## [0.0.6]
 
 ### Fix
