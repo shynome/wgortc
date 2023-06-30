@@ -16,6 +16,8 @@ import (
 )
 
 type Bind struct {
+	NewSettingEngine func() webrtc.SettingEngine
+
 	signaler.Channel
 
 	api *webrtc.API
@@ -50,6 +52,9 @@ func (b *Bind) Open(port uint16) (fns []conn.ReceiveFunc, actualPort uint16, err
 	b.msgCh = make(chan packetMsg, b.BatchSize()-1)
 
 	settingEngine := webrtc.SettingEngine{}
+	if b.NewSettingEngine != nil {
+		settingEngine = b.NewSettingEngine()
+	}
 	if mux.WithUDPMux != nil {
 		b.mux = try.To1(mux.WithUDPMux(&settingEngine, &port))
 		actualPort = port
