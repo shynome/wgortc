@@ -51,7 +51,7 @@ func (b *Bind) Open(port uint16) (fns []conn.ReceiveFunc, actualPort uint16, err
 
 	settingEngine := webrtc.SettingEngine{}
 	if mux.WithUDPMux != nil {
-		b.mux = try.To1(mux.WithUDPMux(settingEngine, port))
+		b.mux = try.To1(mux.WithUDPMux(settingEngine, &port))
 		actualPort = port
 	}
 	b.api = webrtc.NewAPI(webrtc.WithSettingEngine(settingEngine))
