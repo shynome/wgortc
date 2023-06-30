@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	WithUDPMux = func(engine webrtc.SettingEngine, port *uint16) (mux ice.UDPMux, err error) {
+	WithUDPMux = func(engine *webrtc.SettingEngine, port *uint16) (mux ice.UDPMux, err error) {
 		if err = initPort(port); err != nil {
 			return
 		}

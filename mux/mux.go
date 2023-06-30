@@ -5,4 +5,4 @@ import (
 	"github.com/pion/webrtc/v3"
 )
 
-var WithUDPMux func(engine webrtc.SettingEngine, port *uint16) (ice.UDPMux, error)
+var WithUDPMux func(engine *webrtc.SettingEngine, port *uint16) (ice.UDPMux, error)
