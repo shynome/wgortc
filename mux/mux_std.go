@@ -12,16 +12,36 @@ import (
 
 func init() {
 	WithUDPMux = func(engine webrtc.SettingEngine, port *uint16) (mux ice.UDPMux, err error) {
-		conn, err := net.ListenUDP("udp", &net.UDPAddr{Port: int(*port)})
-		if err != nil {
+		if err = initPort(port); err != nil {
 			return
 		}
-		p := netip.MustParseAddrPort(conn.LocalAddr().String())
-		*port = p.Port()
-		if mux, err = ice.NewMultiUDPMuxFromPort(int(*port)); err != nil {
+		f := ice.UDPMuxFromPortWithIPFilter(checkIP)
+		if mux, err = ice.NewMultiUDPMuxFromPort(int(*port), f); err != nil {
 			return
 		}
 		engine.SetICEUDPMux(mux)
 		return
 	}
+}
+
+func initPort(port *uint16) (err error) {
+	conn, err := net.ListenUDP("udp", &net.UDPAddr{Port: int(*port)})
+	if err != nil {
+		return
+	}
+	defer conn.Close()
+
+	p := netip.MustParseAddrPort(conn.LocalAddr().String())
+	*port = p.Port()
+	return nil
+}
+
+func checkIP(ip net.IP) bool {
+	conn, err := net.ListenUDP("udp", &net.UDPAddr{IP: ip})
+	if err != nil {
+		return false
+	}
+	defer conn.Close()
+
+	return true
 }
