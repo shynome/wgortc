@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.10] - 20230630
+
+### Fix
+
+- 当 port 为 0 时现在所有 ip 都会监听同一个随机端口, 而不是每个地址不同端口
+- 当监听某些 IP 地址失败时跳过这些地址而不是报错
+- UDPMux now is working as expect
+
 ## [0.0.9]
 
 ### Fix
