@@ -18,6 +18,7 @@ import (
 )
 
 var peer = &Peer{id: "p2"}
+var serverNet *netstack.Net
 
 func TestMain(m *testing.M) {
 	slog.SetLogLoggerLevel(slog.LevelDebug)
@@ -27,6 +28,7 @@ func TestMain(m *testing.M) {
 		[]netip.Addr{netip.MustParseAddr("8.8.8.8"), netip.MustParseAddr("8.8.4.4")},
 		bind.MTU,
 	))
+	serverNet = tnet
 	bind := bind.New(&Config{peer: peer})
 	bind.SetName("server")
 	logger := logger.New("server")
@@ -78,8 +80,8 @@ func testClient(t *testing.T) {
 	defer dev.Close()
 
 	client := &http.Client{
-		Transport: &http.Transport{DialContext: tnet.DialContext, ResponseHeaderTimeout: time.Hour},
-		Timeout:   10 * time.Hour,
+		Transport: &http.Transport{DialContext: tnet.DialContext},
+		Timeout:   30 * time.Second,
 	}
 	resp := try.To1(client.Get("http://192.168.7.1/"))
 	body := try.To1(io.ReadAll(resp.Body))
