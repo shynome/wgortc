@@ -1,0 +1,297 @@
+package bind
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net"
+	"sync/atomic"
+	"time"
+
+	"github.com/pion/webrtc/v4"
+	"github.com/shynome/err0"
+	"github.com/shynome/err0/try"
+	"github.com/shynome/websocket"
+	"github.com/shynome/websocket/wsjson"
+	"github.com/shynome/wgortc/bind/browser"
+	"github.com/shynome/wgortc/bind/whip"
+	"golang.zx2c4.com/wireguard/conn"
+	"golang.zx2c4.com/wireguard/device"
+)
+
+func (b *Bind) ParseEndpoint(s string) (conn.Endpoint, error) {
+	peer := b.config.GetPeer(nil, s)
+
+	// init outbound
+	outbound := &Outbound{link: s}
+	outbound.bind = b
+	outbound.logger = b.logger.With("peer", peer.GetID()).With("endpoint", s)
+	outbound.peer = peer
+
+	return outbound, nil
+}
+
+type Outbound struct {
+	Endpoint
+	link string
+
+	connecting atomic.Bool
+	wantClear  atomic.Bool
+}
+
+var _ conn.Endpoint = (*Outbound)(nil)
+var _ Sender = (*Outbound)(nil)
+
+func (ep *Outbound) Send(buf []byte) error {
+	if connecting := ep.connecting.Load(); connecting {
+		ep.wantClear.Store(false)
+	}
+	err := ep.Endpoint.Send(buf)
+	if err == nil {
+		return nil
+	}
+	if err == ErrNoDataChannel && buf[0] == WireGuardMessageInitiator {
+		// 握手过程有点耗时
+		go ep.connect(buf)
+		return nil
+	}
+	return err
+}
+
+func (ep *Outbound) ClearSrc() {
+	if connecting := ep.connecting.Load(); connecting {
+		ep.wantClear.Store(true)
+		return
+	}
+	ep.wantClear.Store(false)
+	ep.Endpoint.ClearSrc()
+}
+
+func (ep *Outbound) connect(buf []byte) (err error) {
+	if connecting := ep.connecting.Load(); connecting {
+		return
+	}
+	ep.connecting.Store(true)
+
+	defer err0.Then(&err, nil, func() {
+		ep.logger.Error("connect failed", "error", err)
+	})
+
+	ctx := context.Background()
+	ctx, p2p_connected := context.WithCancelCause(ctx)
+	go func() {
+		<-ctx.Done()
+		ep.connecting.Store(false)
+		if wantClear := ep.wantClear.Load(); wantClear {
+			ep.ClearSrc()
+		}
+	}()
+
+	opts := websocket.DialOptions{
+		Subprotocols: []string{magicStr},
+	}
+	srv, auth := try.To2(browser.SplitAuth(ep.link))
+	if auth != nil {
+		if uname := auth.Username(); uname != "" {
+			opts.Subprotocols = append(opts.Subprotocols, uname)
+		}
+		if pass, _ := auth.Password(); pass != "" {
+			opts.Subprotocols = append(opts.Subprotocols, pass)
+		}
+	}
+	t := time.AfterFunc(device.RekeyTimeout, func() {
+		p2p_connected(context.DeadlineExceeded)
+	})
+	defer t.Stop()
+	conn, _ := try.To2(websocket.Dial(ctx, srv, &opts))
+	t.Stop()
+
+	var hinit = HandshakeInitiation{
+		Initiator: buf,
+	}
+	try.To(wsjson.Write(ctx, conn, hinit))
+	var hresp HandshakeResponse
+	try.To(wsjson.Read(ctx, conn, &hresp))
+	ep.nowsc.Store(hresp.WsTransportDisabled)
+
+	candidates := make(chan webrtc.ICECandidateInit, 1024)
+	serverCandidates := make(chan webrtc.ICECandidateInit, 1024)
+	offerCh := make(chan webrtc.SessionDescription)
+	answerCh := make(chan webrtc.SessionDescription)
+	signaler := &clientSignaler{
+		candidates:       candidates,
+		serverCandidates: serverCandidates,
+		offer:            offerCh,
+		answer:           answerCh,
+	}
+
+	go func() (err error) {
+		defer err0.Then(&err, nil, func() {
+			conn.Close(websocket.StatusInvalidFramePayloadData, "failed to unmarshal JSON")
+			err = fmt.Errorf("read got error. %w", err)
+			if !errors.Is(err, context.Canceled) {
+				ep.logger.Error("连接失败", "error", err)
+			}
+			p2p_connected(err)
+		})
+		defer func() {
+			close(answerCh)
+			close(serverCandidates)
+		}()
+		for {
+			typ, msg := try.To2(conn.Read(ctx))
+			switch typ {
+			case websocket.MessageBinary:
+				ep.bind.Receive(ep, msg)
+			case websocket.MessageText:
+				var payload whip.Payload[json.RawMessage]
+				try.To(json.Unmarshal(msg, &payload))
+				switch payload.Type {
+				case whip.PyalodTypeAnswer:
+					var answer webrtc.SessionDescription
+					try.To(json.Unmarshal(payload.Data, &answer))
+					answerCh <- answer
+				case whip.PyalodTypeCandidate:
+					var cinit webrtc.ICECandidateInit
+					try.To(json.Unmarshal(payload.Data, &cinit))
+					serverCandidates <- cinit
+				}
+			}
+		}
+	}()
+	go iter(ctx, candidates, func(c webrtc.ICECandidateInit) (err error) {
+		defer err0.Then(&err, nil, nil)
+		payload := whip.PayloadCandidate(c)
+		s := try.To1(json.Marshal(payload))
+		try.To(conn.Write(ctx, websocket.MessageText, s))
+		return nil
+	})
+	go iter(ctx, offerCh, func(c webrtc.SessionDescription) (err error) {
+		defer err0.Then(&err, nil, nil)
+		payload := whip.PayloadOffer(c)
+		s := try.To1(json.Marshal(payload))
+		try.To(conn.Write(ctx, websocket.MessageText, s))
+		return nil
+	})
+
+	ep.logger.Info("websocket 连接成功")
+	ep.conn.Store(conn)
+
+	handshake := func() {
+		defer p2p_connected(nil)
+		defer func() {
+			ep.conn.Store(nil)
+		}()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				err := ep.handshake(signaler)
+				if err != nil {
+					time.Sleep(time.Second)
+					continue
+				}
+				return
+			}
+		}
+	}
+
+	go handshake()
+	return nil
+}
+
+func (ep *Outbound) handshake(signaler *clientSignaler) (err error) {
+	defer err0.Then(&err, nil, nil)
+
+	ep.logger.Debug("开始握手")
+
+	pcinit := ep.peer.GetPeerInit()
+	pc := try.To1(ep.bind.NewPeerConnection(pcinit))
+	dcinit := webrtc.DataChannelInit{
+		Ordered:        ref(false),
+		MaxRetransmits: ref[uint16](0),
+	}
+	dc := try.To1(pc.CreateDataChannel(magicStr, &dcinit))
+	dc.OnMessage(func(msg webrtc.DataChannelMessage) {
+		ep.bind.Receive(ep, msg.Data)
+	})
+	if pc := ep.pc.Swap(pc); pc != nil {
+		pc.Close()
+	}
+	defer err0.Then(&err, nil, func() {
+		pc.Close()
+	})
+
+	pc.OnICECandidate(func(i *webrtc.ICECandidate) {
+		if i == nil {
+			return
+		}
+		select {
+		case signaler.candidates <- i.ToJSON():
+		default:
+		}
+	})
+
+	ctx := context.Background()
+	wctx, cause := context.WithCancelCause(ctx)
+	defer cause(nil)
+	pc.OnConnectionStateChange(func(pcs webrtc.PeerConnectionState) {
+		switch pcs {
+		case webrtc.PeerConnectionStateConnected:
+		case webrtc.PeerConnectionStateClosed:
+			cause(whip.ErrPCConnectionClosed)
+		case webrtc.PeerConnectionStateFailed:
+			cause(whip.ErrPCConnectionFailed)
+		}
+	})
+
+	dc.OnOpen(func() {
+		defer cause(nil)
+		ep.dc.Store(dc)
+	})
+	dc.OnClose(func() {
+		defer cause(net.ErrClosed)
+		ep.dc.Store(nil)
+	})
+
+	ep.logger.Debug("发送握手信息")
+	defer err0.Then(&err, func() {
+		ep.logger.Info("握手成功")
+	}, func() {
+		ep.logger.Info("握手失败", "error", err)
+	})
+
+	offer := try.To1(pc.CreateOffer(nil))
+	try.To(pc.SetLocalDescription(offer))
+	signaler.offer <- offer
+	answer, ok := <-signaler.answer
+	if !ok {
+		return fmt.Errorf("signler is closed")
+	}
+	try.To(pc.SetRemoteDescription(answer))
+	go iter(wctx, signaler.serverCandidates, func(c webrtc.ICECandidateInit) error {
+		if err := pc.AddICECandidate(c); err != nil {
+			ep.logger.Warn("add ice candidate failed", "error", err)
+		} else {
+			ep.logger.Debug("added ice candidate", "candidate", c)
+		}
+		return nil
+	})
+
+	<-wctx.Done()
+	if err := context.Cause(wctx); errors.Is(err, context.Canceled) {
+		return nil
+	} else {
+		return err
+	}
+}
+
+type clientSignaler struct {
+	candidates       chan<- webrtc.ICECandidateInit
+	serverCandidates <-chan webrtc.ICECandidateInit
+
+	offer  chan<- webrtc.SessionDescription
+	answer <-chan webrtc.SessionDescription
+}
