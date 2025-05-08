@@ -121,9 +121,6 @@ func (b *Bind) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}()
 	go iter(ctx, candidates, func(c webrtc.ICECandidateInit) (err error) {
 		defer err0.Then(&err, nil, nil)
-		if c.SDPMid == nil {
-			return nil
-		}
 		payload := whip.PayloadCandidate(c)
 		s := try.To1(json.Marshal(payload))
 		try.To(conn.Write(ctx, websocket.MessageText, s))
