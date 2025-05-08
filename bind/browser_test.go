@@ -1,6 +1,7 @@
 package bind_test
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/agnivade/wasmbrowsertest/filesys"
 	"github.com/shynome/err0/try"
 )
 
@@ -19,9 +19,14 @@ func TestBrowser(t *testing.T) {
 	testBrowser(t, false)
 }
 
+//go:generate go install github.com/agnivade/wasmbrowsertest@v0.11.0
+
 func testBrowser(t *testing.T, nowsc bool) {
 	buildTry(nowsc)
-	testWasm := exec.Command("bash", "-c", "WASM_HEADLESS=off go run github.com/agnivade/wasmbrowsertest browser_test.wasm")
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	testWasm := exec.CommandContext(ctx, "bash", "-c", "WASM_HEADLESS=off wasmbrowsertest browser_test.wasm")
 	testWasm.Stdout = os.Stdout
 	testWasm.Stderr = os.Stderr
 	try.To(testWasm.Start())
@@ -29,15 +34,19 @@ func testBrowser(t *testing.T, nowsc bool) {
 		Transport: &http.Transport{DialContext: serverNet.DialContext},
 		Timeout:   30 * time.Second,
 	}
-	resp := try.To1(client.Get("http://192.168.7.2/browser"))
-	body := try.To1(io.ReadAll(resp.Body))
 
-	if body := string(body); body != "hello world!" {
-		t.Error(body)
-	}
+	func() {
+		defer cancel()
 
-	go client.Get("http://192.168.7.2/exit")
-	try.To(testWasm.Wait())
+		resp := try.To1(client.Get("http://192.168.7.2/"))
+		body := try.To1(io.ReadAll(resp.Body))
+
+		if body := string(body); body != "hello world!" {
+			t.Error(body)
+		}
+	}()
+
+	testWasm.Wait()
 }
 
 func buildTry(nowsc bool) {

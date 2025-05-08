@@ -1,5 +1,3 @@
-github.com/agnivade/wasmbrowsertest v0.11.0 h1:Feg5lmJzfC3j9nMgOxRZdYqzYtt93MvcFG29KeRt2VI=
-github.com/agnivade/wasmbrowsertest v0.11.0/go.mod h1:kgT4RR8m3auEg0UdL0uOj/0hCjRt5yQQNb4kjUY5GgU=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/google/btree v1.0.1 h1:gK4Kx5IaGY9CD5sPJ36FHiBJ6ZXl0kilRiiCj+jdYp4=

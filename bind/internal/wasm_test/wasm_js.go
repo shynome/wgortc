@@ -42,11 +42,8 @@ func main() {
 
 	srv := http.NewServeMux()
 
-	srv.HandleFunc("/browser", func(w http.ResponseWriter, r *http.Request) {
+	srv.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, "hello world!")
-	})
-	srv.HandleFunc("/exit", func(w http.ResponseWriter, r *http.Request) {
-		l.Close()
 	})
 
 	http.Serve(l, srv)

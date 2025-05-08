@@ -3,7 +3,6 @@ module github.com/shynome/wgortc
 go 1.24.0
 
 require (
-	github.com/agnivade/wasmbrowsertest v0.11.0
 	github.com/pion/ice/v4 v4.0.10
 	github.com/pion/webrtc/v4 v4.0.15
 	github.com/shynome/err0 v0.2.1
