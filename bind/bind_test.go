@@ -124,6 +124,7 @@ type Peer struct {
 }
 
 var _ bind.Peer = (*Peer)(nil)
+var _ bind.DebugPeer = (*Peer)(nil)
 
 func (p *Peer) GetPeerInit() webrtc.Configuration { return p.pcinit }
 func (p *Peer) GetID() string                     { return p.id }

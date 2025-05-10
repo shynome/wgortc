@@ -31,6 +31,10 @@ type Config interface {
 type Peer interface {
 	GetID() string // 用以辨别节点
 	GetPeerInit() webrtc.Configuration
+}
+
+type DebugPeer interface {
+	// Deprecated: 这个接口未来很有可能删除
 	WsTransportDisabled() bool // webrtc data channel 连通性调试用
 }
 

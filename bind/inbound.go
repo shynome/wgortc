@@ -45,7 +45,10 @@ func (b *Bind) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	nowsc := peer.WsTransportDisabled()
+	nowsc := false
+	if peer, ok := peer.(DebugPeer); ok {
+		nowsc = peer.WsTransportDisabled()
+	}
 	hresp := HandshakeResponse{
 		WsTransportDisabled: nowsc,
 	}
@@ -56,7 +59,7 @@ func (b *Bind) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	inbound.bind = b
 	inbound.logger = b.logger.With("peer", peer.GetID())
 	inbound.peer = peer
-	inbound.nowsc.Store(peer.WsTransportDisabled())
+	inbound.nowsc.Store(nowsc)
 
 	var ep wgconn.Endpoint = inbound
 	if natc, ok := peer.(nat.INAT); ok {
