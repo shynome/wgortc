@@ -13,8 +13,8 @@ import (
 	"github.com/shynome/err0/try"
 	"github.com/shynome/websocket"
 	"github.com/shynome/websocket/wsjson"
-	"github.com/shynome/wgortc/bind/nat"
 	"github.com/shynome/wgortc/bind/whip"
+	"github.com/shynome/wgortc/nat"
 	wgconn "golang.zx2c4.com/wireguard/conn"
 )
 
