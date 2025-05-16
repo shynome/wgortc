@@ -41,7 +41,7 @@ type Outbound struct {
 }
 
 var _ conn.Endpoint = (*Outbound)(nil)
-var _ Sender = (*Outbound)(nil)
+var _ whip.Sender = (*Outbound)(nil)
 
 func (ep *Outbound) Send(buf []byte) error {
 	if connecting := ep.connecting.Load(); connecting {

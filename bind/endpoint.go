@@ -11,12 +11,9 @@ import (
 
 	"github.com/pion/webrtc/v4"
 	"github.com/shynome/websocket"
+	"github.com/shynome/wgortc/bind/whip"
 	"golang.zx2c4.com/wireguard/conn"
 )
-
-type Sender interface {
-	Send(buf []byte) error
-}
 
 type Endpoint struct {
 	bind   bindPower
@@ -30,7 +27,7 @@ type Endpoint struct {
 }
 
 var _ conn.Endpoint = (*Endpoint)(nil)
-var _ Sender = (*Endpoint)(nil)
+var _ whip.Sender = (*Endpoint)(nil)
 
 func (ep *Endpoint) Send(buf []byte) error {
 	if dc := ep.dc.Load(); dc != nil {

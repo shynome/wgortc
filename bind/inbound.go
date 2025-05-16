@@ -63,7 +63,7 @@ func (b *Bind) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	var ep wgconn.Endpoint = inbound
 	if natc, ok := peer.(nat.INAT); ok {
-		ep = nat.New(ep, natc)
+		ep = nat.New(inbound, natc)
 	}
 
 	inbound.logger.Info("websocket 连接成功")
@@ -167,7 +167,7 @@ type Inbound struct {
 }
 
 var _ wgconn.Endpoint = (*Inbound)(nil)
-var _ Sender = (*Endpoint)(nil)
+var _ whip.Sender = (*Endpoint)(nil)
 
 func (ep *Inbound) handshake(signaler *serverSignaler, offer webrtc.SessionDescription) (err error) {
 	defer err0.Then(&err, nil, nil)

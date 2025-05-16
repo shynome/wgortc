@@ -1,13 +1,16 @@
 package nat
 
-import "golang.zx2c4.com/wireguard/conn"
+import (
+	"github.com/shynome/wgortc/bind/whip"
+	"golang.zx2c4.com/wireguard/conn"
+)
 
 type Endpoint struct {
-	conn.Endpoint
+	whip.Endpoint
 	INAT
 }
 
-func New(ep conn.Endpoint, natc INAT) conn.Endpoint {
+func New(ep whip.Endpoint, natc INAT) conn.Endpoint {
 	return &Endpoint{
 		Endpoint: ep,
 		INAT:     natc,

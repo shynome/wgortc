@@ -10,6 +10,7 @@ import (
 
 	"github.com/pion/webrtc/v4"
 	"github.com/shynome/err0"
+	"github.com/shynome/wgortc/bind/whip"
 	"golang.zx2c4.com/wireguard/conn"
 )
 
@@ -116,7 +117,7 @@ func (b *Bind) Close() error {
 }
 
 func (*Bind) Send(bufs [][]byte, ep conn.Endpoint) error {
-	sender, ok := ep.(Sender)
+	sender, ok := ep.(whip.Sender)
 	if !ok {
 		return ErrEndpointImpl
 	}
