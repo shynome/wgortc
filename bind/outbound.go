@@ -131,7 +131,7 @@ func (ep *Outbound) connect(buf []byte) (err error) {
 			conn.Close(websocket.StatusInvalidFramePayloadData, "failed to unmarshal JSON")
 			err = fmt.Errorf("read got error. %w", err)
 			if !errors.Is(err, context.Canceled) {
-				ep.logger.Error("连接失败", "error", err)
+				ep.logger.Error("websocket 连接失败", "error", err)
 			}
 			p2p_connected(err)
 		})
@@ -205,7 +205,7 @@ func (ep *Outbound) connect(buf []byte) (err error) {
 func (ep *Outbound) handshake(signaler *clientSignaler) (err error) {
 	defer err0.Then(&err, nil, nil)
 
-	ep.logger.Debug("开始握手")
+	ep.logger.Debug("webrtc 开始握手")
 
 	pcinit := ep.peer.GetPeerInit()
 	pc := try.To1(ep.bind.NewPeerConnection(pcinit))
@@ -256,11 +256,11 @@ func (ep *Outbound) handshake(signaler *clientSignaler) (err error) {
 		ep.dc.Store(nil)
 	})
 
-	ep.logger.Debug("发送握手信息")
+	ep.logger.Debug("webrtc 发送握手信息")
 	defer err0.Then(&err, func() {
-		ep.logger.Info("握手成功")
+		ep.logger.Info("webrtc 握手成功")
 	}, func() {
-		ep.logger.Info("握手失败", "error", err)
+		ep.logger.Info("webrtc 握手失败", "error", err)
 	})
 
 	offer := try.To1(pc.CreateOffer(nil))

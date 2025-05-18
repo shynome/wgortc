@@ -172,7 +172,7 @@ var _ whip.Sender = (*Endpoint)(nil)
 func (ep *Inbound) handshake(signaler *serverSignaler, offer webrtc.SessionDescription) (err error) {
 	defer err0.Then(&err, nil, nil)
 
-	ep.logger.Debug("开始握手")
+	ep.logger.Debug("webrtc 开始握手")
 	pcinit := ep.peer.GetPeerInit()
 	pc := try.To1(ep.bind.NewPeerConnection(pcinit))
 	if pc := ep.pc.Swap(pc); pc != nil {
@@ -228,11 +228,11 @@ func (ep *Inbound) handshake(signaler *serverSignaler, offer webrtc.SessionDescr
 		// })
 	})
 
-	ep.logger.Debug("发送握手信息")
+	ep.logger.Debug("webrtc 发送握手信息")
 	defer err0.Then(&err, func() {
-		ep.logger.Info("握手成功")
+		ep.logger.Info("webrtc 握手成功")
 	}, func() {
-		ep.logger.Error("握手失败", "error", err)
+		ep.logger.Error("webrtc 握手失败", "error", err)
 	})
 
 	try.To(pc.SetRemoteDescription(offer))
