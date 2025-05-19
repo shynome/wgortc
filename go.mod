@@ -35,3 +35,5 @@ require (
 	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8 // indirect
 	golang.zx2c4.com/wintun v0.0.0-20230126152724-0fa3db229ce2 // indirect
 )
+
+replace golang.zx2c4.com/wireguard => github.com/remoon-net/wireguard-go v0.0.0-20250101131202-1eae1370c284

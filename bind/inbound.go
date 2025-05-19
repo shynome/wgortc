@@ -61,9 +61,9 @@ func (b *Bind) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	inbound.peer = peer
 	inbound.nowsc.Store(nowsc)
 
-	var ep wgconn.Endpoint = inbound
+	inbound.INAT = nat.Empty{}
 	if natc, ok := peer.(nat.INAT); ok {
-		ep = nat.New(inbound, natc)
+		inbound.INAT = natc
 	}
 
 	inbound.logger.Info("websocket 连接成功")
@@ -72,7 +72,7 @@ func (b *Bind) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		inbound.conn.Store(nil)
 	}()
 
-	if received := inbound.bind.Receive(ep, hinit.Initiator); !received {
+	if received := inbound.bind.Receive(inbound, hinit.Initiator); !received {
 		conn.Close(WsStatusServiceUnavailable, "wg device is not up")
 		return
 	}
@@ -104,7 +104,7 @@ func (b *Bind) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				if nowsc && msg[0] == WireGuardMessageData {
 					continue
 				}
-				inbound.bind.Receive(ep, msg)
+				inbound.bind.Receive(inbound, msg)
 			case websocket.MessageText:
 				var payload whip.Payload[json.RawMessage]
 				try.To(json.Unmarshal(msg, &payload))
@@ -164,10 +164,12 @@ type HandshakeResponse struct {
 
 type Inbound struct {
 	Endpoint
+	nat.INAT
 }
 
 var _ wgconn.Endpoint = (*Inbound)(nil)
-var _ whip.Sender = (*Endpoint)(nil)
+var _ whip.Sender = (*Inbound)(nil)
+var _ nat.INAT = (*Inbound)(nil)
 
 func (ep *Inbound) handshake(signaler *serverSignaler, offer webrtc.SessionDescription) (err error) {
 	defer err0.Then(&err, nil, nil)

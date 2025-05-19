@@ -16,6 +16,7 @@ import (
 	"github.com/shynome/websocket/wsjson"
 	"github.com/shynome/wgortc/bind/browser"
 	"github.com/shynome/wgortc/bind/whip"
+	"github.com/shynome/wgortc/nat"
 	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"
 )
@@ -29,11 +30,17 @@ func (b *Bind) ParseEndpoint(s string) (conn.Endpoint, error) {
 	outbound.logger = b.logger.With("peer", peer.GetID()).With("endpoint", s)
 	outbound.peer = peer
 
+	outbound.INAT = nat.Empty{}
+	if natc, ok := peer.(nat.INAT); ok {
+		outbound.INAT = natc
+	}
+
 	return outbound, nil
 }
 
 type Outbound struct {
 	Endpoint
+	nat.INAT
 	link string
 
 	connecting atomic.Bool
@@ -42,6 +49,7 @@ type Outbound struct {
 
 var _ conn.Endpoint = (*Outbound)(nil)
 var _ whip.Sender = (*Outbound)(nil)
+var _ nat.INAT = (*Outbound)(nil)
 
 func (ep *Outbound) Send(buf []byte) error {
 	if connecting := ep.connecting.Load(); connecting {
