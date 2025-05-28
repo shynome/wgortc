@@ -11,6 +11,7 @@ import (
 	"gvisor.dev/gvisor/pkg/tcpip"
 	"gvisor.dev/gvisor/pkg/tcpip/header"
 	"gvisor.dev/gvisor/pkg/tcpip/link/channel"
+	"gvisor.dev/gvisor/pkg/tcpip/link/loopback"
 	"gvisor.dev/gvisor/pkg/tcpip/network/ipv4"
 	"gvisor.dev/gvisor/pkg/tcpip/network/ipv6"
 	"gvisor.dev/gvisor/pkg/tcpip/stack"
@@ -33,7 +34,8 @@ type netTun struct {
 var globalNIC int32 = 0
 
 func CreateTUN(name string, mtu int) (tdev *netTun, err error) {
-	nic := tcpip.NICID(atomic.AddInt32(&globalNIC, 1))
+	loNIC := tcpip.NICID(atomic.AddInt32(&globalNIC, 2))
+	nic := loNIC - 1
 
 	opts := stack.Options{
 		NetworkProtocols:   []stack.NetworkProtocolFactory{ipv4.NewProtocol, ipv6.NewProtocol},
@@ -60,6 +62,15 @@ func CreateTUN(name string, mtu int) (tdev *netTun, err error) {
 	}
 	dev.stack.AddRoute(tcpip.Route{Destination: header.IPv4EmptySubnet, NIC: dev.nic})
 	dev.stack.AddRoute(tcpip.Route{Destination: header.IPv6EmptySubnet, NIC: dev.nic})
+
+	// loopback
+	lo := loopback.New()
+	if tcpipErr := dev.stack.CreateNIC(loNIC, lo); tcpipErr != nil {
+		return nil, fmt.Errorf("CreateLoopbackNIC: %v", tcpipErr)
+	}
+	dev.stack.AddRoute(tcpip.Route{Destination: header.IPv4EmptySubnet, NIC: loNIC})
+	dev.stack.AddRoute(tcpip.Route{Destination: header.IPv6EmptySubnet, NIC: loNIC})
+
 	dev.events <- tun.EventUp
 	return dev, nil
 }

@@ -29,9 +29,12 @@ func RouteUp(tdev GetStack, routes []string) (err error) {
 			},
 		}
 		nic := tdev.NIC()
-		tcpipErr := stk.AddProtocolAddress(nic, protoAddr, stack.AddressProperties{})
-		if tcpipErr != nil {
-			return fmt.Errorf("AddProtocolAddress(%v): %v", pf.String(), tcpipErr)
+		loNIC := nic + 1
+		for _, nic := range []tcpip.NICID{nic, loNIC} {
+			tcpipErr := stk.AddProtocolAddress(nic, protoAddr, stack.AddressProperties{})
+			if tcpipErr != nil {
+				return fmt.Errorf("AddProtocolAddress(%v): %v", pf.String(), tcpipErr)
+			}
 		}
 	}
 	return nil
