@@ -34,11 +34,6 @@ type Peer interface {
 	GetPeerInit() webrtc.Configuration
 }
 
-type DebugPeer interface {
-	// Deprecated: 这个接口未来很有可能删除
-	WsTransportDisabled() bool // webrtc data channel 连通性调试用
-}
-
 func New(config Config) *Bind {
 	b := &Bind{
 		config: config,

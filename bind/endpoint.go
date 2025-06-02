@@ -2,7 +2,6 @@ package bind
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/netip"
@@ -19,7 +18,7 @@ type Endpoint struct {
 	bind   bindPower
 	logger *slog.Logger
 	peer   Peer
-	nowsc  atomic.Bool
+	mode   atomic.Uint32
 
 	pc   atomic.Pointer[webrtc.PeerConnection]
 	conn atomic.Pointer[websocket.Conn]
@@ -30,12 +29,14 @@ var _ conn.Endpoint = (*Endpoint)(nil)
 var _ whip.Sender = (*Endpoint)(nil)
 
 func (ep *Endpoint) Send(buf []byte) error {
+	tm := TransportMode(ep.mode.Load())
 	if dc := ep.dc.Load(); dc != nil {
 		err := dc.Send(buf)
 		return err
 	}
 	if wsc := ep.conn.Load(); wsc != nil {
-		if nowsc := ep.nowsc.Load(); nowsc && buf[0] == WireGuardMessageData {
+		nowsc := tm&WSTransportDisabled != 0
+		if nowsc && buf[0] == WireGuardMessageData {
 			return ErrWSCDrop
 		}
 		ctx := context.Background()
@@ -113,6 +114,3 @@ func (ep *Endpoint) DstToString() (addr string) {
 
 func (*Endpoint) DstIP() netip.Addr { return netip.Addr{} }
 func (*Endpoint) SrcIP() netip.Addr { return netip.Addr{} }
-
-var ErrNoDataChannel = errors.New("no available data channel")
-var ErrWSCDrop = errors.New("drop data when nowsc is true")

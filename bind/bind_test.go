@@ -59,9 +59,11 @@ func TestMain(m *testing.M) {
 const testCheckResponseText = "Hello from userspace TCP!"
 
 func TestClient(t *testing.T) {
-	peer.nowsc = true
+	peer.tm = 0
 	testClient(t)
-	peer.nowsc = false
+	peer.tm = bind.WSTransportDisabled
+	testClient(t)
+	peer.tm = bind.WebRTCTransportDisabled
 	testClient(t)
 }
 
@@ -120,12 +122,12 @@ func (c *Config) GetPeer(initiator []byte, endpoint string) bind.Peer { return c
 type Peer struct {
 	id     string
 	pcinit webrtc.Configuration
-	nowsc  bool
+	tm     bind.TransportMode
 }
 
 var _ bind.Peer = (*Peer)(nil)
-var _ bind.DebugPeer = (*Peer)(nil)
+var _ bind.PeerMode = (*Peer)(nil)
 
 func (p *Peer) GetPeerInit() webrtc.Configuration { return p.pcinit }
 func (p *Peer) GetID() string                     { return p.id }
-func (p *Peer) WsTransportDisabled() bool         { return p.nowsc }
+func (p *Peer) TransportMode() bind.TransportMode { return p.tm }

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"time"
 
 	"github.com/pion/webrtc/v4"
 	"github.com/shynome/err0"
@@ -45,12 +46,18 @@ func (b *Bind) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	nowsc := false
-	if peer, ok := peer.(DebugPeer); ok {
-		nowsc = peer.WsTransportDisabled()
+	var tm TransportMode = 0
+	if peer, ok := peer.(PeerMode); ok {
+		tm = peer.TransportMode()
 	}
+
+	if tm&AllTransportDisabled == AllTransportDisabled {
+		conn.Close(WsStatusBadRequest, "All transports are disabled")
+		return
+	}
+
 	hresp := HandshakeResponse{
-		WsTransportDisabled: nowsc,
+		TransportMode: uint32(tm),
 	}
 	try.To(wsjson.Write(ctx, conn, hresp))
 
@@ -59,7 +66,7 @@ func (b *Bind) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	inbound.bind = b
 	inbound.logger = b.logger.With("peer", peer.GetID())
 	inbound.peer = peer
-	inbound.nowsc.Store(nowsc)
+	inbound.mode.Store(uint32(tm))
 
 	inbound.INAT = nat.Empty{}
 	if natc, ok := peer.(nat.INAT); ok {
@@ -97,6 +104,7 @@ func (b *Bind) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			close(offerCh)
 			close(clientCandidates)
 		}()
+		nowsc := tm&WSTransportDisabled != 0
 		for {
 			typ, msg := try.To2(conn.Read(ctx))
 			switch typ {
@@ -159,7 +167,7 @@ type HandshakeInitiation struct {
 }
 
 type HandshakeResponse struct {
-	WsTransportDisabled bool `json:"nowsc"`
+	TransportMode uint32 `json:"transport_mode"`
 }
 
 type Inbound struct {
@@ -173,6 +181,26 @@ var _ nat.INAT = (*Inbound)(nil)
 
 func (ep *Inbound) handshake(signaler *serverSignaler, offer webrtc.SessionDescription) (err error) {
 	defer err0.Then(&err, nil, nil)
+
+	tm := TransportMode(ep.mode.Load())
+	nowrtc := tm&WebRTCTransportDisabled != 0
+	if nowrtc {
+		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(ctx, time.Second)
+		defer cancel()
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-signaler.clientCandidates:
+					// 任何事都不做, 只是避免阻塞
+				}
+			}
+		}()
+		<-ctx.Done()
+		return ErrWebRTCDisabled
+	}
 
 	ep.logger.Debug("webrtc 开始握手")
 	pcinit := ep.peer.GetPeerInit()

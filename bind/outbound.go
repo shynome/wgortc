@@ -121,7 +121,7 @@ func (ep *Outbound) connect(buf []byte) (err error) {
 	try.To(wsjson.Write(ctx, conn, hinit))
 	var hresp HandshakeResponse
 	try.To(wsjson.Read(ctx, conn, &hresp))
-	ep.nowsc.Store(hresp.WsTransportDisabled)
+	ep.mode.Store(hresp.TransportMode)
 
 	candidates := make(chan webrtc.ICECandidateInit, 1024)
 	serverCandidates := make(chan webrtc.ICECandidateInit, 1024)
@@ -212,6 +212,28 @@ func (ep *Outbound) connect(buf []byte) (err error) {
 
 func (ep *Outbound) handshake(signaler *clientSignaler) (err error) {
 	defer err0.Then(&err, nil, nil)
+
+	tm := TransportMode(ep.mode.Load())
+	nowrtc := tm&WebRTCTransportDisabled != 0
+	if nowrtc {
+		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(ctx, time.Second)
+		defer cancel()
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-signaler.serverCandidates:
+					// 任何事都不做, 只是避免阻塞
+				case <-signaler.answer:
+					// 任何事都不做, 只是避免阻塞
+				}
+			}
+		}()
+		<-ctx.Done()
+		return ErrWebRTCDisabled
+	}
 
 	ep.logger.Debug("webrtc 开始握手")
 
