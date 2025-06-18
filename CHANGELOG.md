@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.4.1] - 2025-06-18
+
+- 默认不启用 WebSocket 跳转
+- 修复 connect 出错时未正确释放 connecting 锁的问题
+
 ## [0.4.0] - 2025-06-18
 
 - 支持 WebSocket 跳转. 状态码(3307)
