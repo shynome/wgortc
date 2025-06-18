@@ -12,5 +12,6 @@ const (
 	WsStatusBadRequest         = WsStatusBase + http.StatusBadRequest
 	WsStatusServiceUnavailable = WsStatusBase + http.StatusServiceUnavailable
 	WsStatusNotAcceptable      = WsStatusBase + http.StatusNotAcceptable
+	WsStatusTemporaryRedirect  = WsStatusBase + http.StatusTemporaryRedirect
 	WsStatusClientClosed       = WsStatusBase + 499
 )

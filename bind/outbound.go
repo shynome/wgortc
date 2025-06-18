@@ -96,31 +96,49 @@ func (ep *Outbound) connect(buf []byte) (err error) {
 		}
 	}()
 
-	opts := websocket.DialOptions{
-		Subprotocols: []string{magicStr},
-	}
-	srv, auth := try.To2(browser.SplitAuth(ep.link))
-	if auth != nil {
-		if uname := auth.Username(); uname != "" {
-			opts.Subprotocols = append(opts.Subprotocols, uname)
-		}
-		if pass, _ := auth.Password(); pass != "" {
-			opts.Subprotocols = append(opts.Subprotocols, pass)
-		}
-	}
 	t := time.AfterFunc(device.RekeyTimeout, func() {
 		p2p_connected(context.DeadlineExceeded)
 	})
 	defer t.Stop()
-	conn, _ := try.To2(websocket.Dial(ctx, srv, &opts))
-	t.Stop()
 
 	var hinit = HandshakeInitiation{
 		Initiator: buf,
 	}
-	try.To(wsjson.Write(ctx, conn, hinit))
 	var hresp HandshakeResponse
-	try.To(wsjson.Read(ctx, conn, &hresp))
+
+	var conn *websocket.Conn
+	link := ep.link
+	for {
+		opts := websocket.DialOptions{
+			Subprotocols: []string{magicStr},
+		}
+		srv, auth := try.To2(browser.SplitAuth(link))
+		if auth != nil {
+			if uname := auth.Username(); uname != "" {
+				opts.Subprotocols = append(opts.Subprotocols, uname)
+			}
+			if pass, _ := auth.Password(); pass != "" {
+				opts.Subprotocols = append(opts.Subprotocols, pass)
+			}
+		}
+		conn, _ = try.To2(websocket.Dial(ctx, srv, &opts))
+		wsjson.Write(ctx, conn, hinit) // 虽然这里也有可能出错, 但忽略它不影响下方的出错, 这样只处理一个出错点更简单
+		err := wsjson.Read(ctx, conn, &hresp)
+		if err == nil {
+			break
+		}
+		conn.CloseNow()
+		var e websocket.CloseError
+		if errors.As(err, &e) {
+			if e.Code == WsStatusTemporaryRedirect {
+				link = e.Reason
+				continue
+			}
+		}
+		try.To(err)
+	}
+	t.Stop()
+
 	ep.mode.Store(hresp.TransportMode)
 
 	candidates := make(chan webrtc.ICECandidateInit, 1024)
