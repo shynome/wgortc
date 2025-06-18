@@ -21,16 +21,17 @@ import (
 
 var _ http.Handler = (*Bind)(nil)
 
+var WsAcceptOptions = &websocket.AcceptOptions{
+	OriginPatterns: []string{"*"},
+	Subprotocols:   []string{magicStr},
+}
+
 func (b *Bind) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var err error
 	defer err0.Then(&err, nil, func() {
 		b.logger.Error("失败了", "error", err)
 	})
-	opts := &websocket.AcceptOptions{
-		OriginPatterns: []string{"*"},
-		Subprotocols:   []string{magicStr},
-	}
-	conn := try.To1(websocket.Accept(w, r, opts))
+	conn := try.To1(websocket.Accept(w, r, WsAcceptOptions))
 	defer conn.Close(websocket.StatusNormalClosure, "")
 
 	ctx := r.Context()
