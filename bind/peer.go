@@ -9,8 +9,9 @@ type PeerMode interface {
 type TransportMode uint32
 
 const (
-	WSTransportDisabled     TransportMode = 0b0000_0000_0000_0001
-	WebRTCTransportDisabled TransportMode = 0b0000_0000_0000_0010
+	WSTransportDisabled TransportMode = 1 << (iota + 1)
+	WebRTCTransportDisabled
+	WSRedirectEnabled
 )
 
 const (

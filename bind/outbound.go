@@ -109,6 +109,11 @@ func (ep *Outbound) connect(buf []byte) (err error) {
 	}
 	var hresp HandshakeResponse
 
+	var tm TransportMode
+	if m, ok := ep.peer.(PeerMode); ok {
+		tm = m.TransportMode()
+	}
+
 	var conn *websocket.Conn
 	link := ep.link
 	for {
@@ -133,7 +138,8 @@ func (ep *Outbound) connect(buf []byte) (err error) {
 		conn.CloseNow()
 		var e websocket.CloseError
 		if errors.As(err, &e) {
-			if e.Code == WsStatusTemporaryRedirect {
+			redirectEnabled := tm&WSRedirectEnabled != 0
+			if e.Code == WsStatusTemporaryRedirect && redirectEnabled {
 				link = e.Reason
 				continue
 			}

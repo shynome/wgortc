@@ -117,7 +117,9 @@ func TestWebSocketRedirect(t *testing.T) {
 		[]netip.Addr{netip.MustParseAddr("8.8.8.8"), netip.MustParseAddr("8.8.4.4")},
 		bind.MTU,
 	))
-	bind := bind.New(&Config{peer: &Peer{id: "p1"}})
+	p := &Peer{id: "p1"}
+	p.tm = bind.WSRedirectEnabled
+	bind := bind.New(&Config{peer: p})
 	bind.SetName("client")
 	logger := logger.New("client")
 	dev := device.NewDevice(tdev, bind, logger)
