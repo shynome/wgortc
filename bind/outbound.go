@@ -95,6 +95,9 @@ func (ep *Outbound) connect(buf []byte) (err error) {
 			ep.ClearSrc()
 		}
 	}()
+	defer err0.Then(&err, nil, func() {
+		p2p_connected(err)
+	})
 
 	t := time.AfterFunc(device.RekeyTimeout, func() {
 		p2p_connected(context.DeadlineExceeded)
