@@ -1,6 +1,7 @@
 package bind_test
 
 import (
+	"encoding/hex"
 	"io"
 	"log/slog"
 	"net"
@@ -157,12 +158,31 @@ func TestClient3(t *testing.T) {
 		Transport: &http.Transport{DialContext: tnet.DialContext},
 		Timeout:   30 * time.Second,
 	}
-	resp := try.To1(client.Get("http://192.168.7.1/"))
-	body := try.To1(io.ReadAll(resp.Body))
 
-	if body := string(body); body != testCheckResponseText {
-		t.Error(body)
+	{
+		resp := try.To1(client.Get("http://192.168.7.1/"))
+		body := try.To1(io.ReadAll(resp.Body))
+
+		if body := string(body); body != testCheckResponseText {
+			t.Error(body)
+		}
 	}
+
+	{
+		pubkey, _ := hex.DecodeString("53027c3439d3753fd7335542f303c5ee2bb418c3f714af35a913d24251d0ee35")
+		p := dev.LookupPeer(device.NoisePublicKey(pubkey))
+		p.ExpireCurrentKeypairs()
+	}
+
+	{
+		resp := try.To1(client.Get("http://192.168.7.1/"))
+		body := try.To1(io.ReadAll(resp.Body))
+
+		if body := string(body); body != testCheckResponseText {
+			t.Error(body)
+		}
+	}
+
 }
 
 // key: 4KKSeQMXqfT0SRV/f7LkPbWjpyjCS6IfBwr7gY2nr0M=

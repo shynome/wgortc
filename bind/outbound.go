@@ -91,8 +91,10 @@ func (ep *Outbound) connect(buf []byte) (err error) {
 	}
 	ep.connecting.Store(true)
 
-	defer err0.Then(&err, nil, func() {
-		ep.logger.Error("connect failed", "error", err)
+	defer err0.Then(&err, func() {
+		ep.lc = 0 // 连接成功后将lc重置为0, 还是以第一个endpoint为主, 剩余的作为辅助
+	}, func() {
+		ep.logger.Error("connect failed", "error", err, "lc", ep.lc)
 		lc := (ep.lc + 1) % len(ep.links)
 		ep.lc = lc
 	})
