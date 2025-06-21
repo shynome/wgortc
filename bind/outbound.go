@@ -144,13 +144,13 @@ func (ep *Outbound) connect(buf []byte) (err error) {
 		}
 		conn, _ = try.To2(websocket.Dial(ctx, srv, &opts))
 		wsjson.Write(ctx, conn, hinit) // 虽然这里也有可能出错, 但忽略它不影响下方的出错, 这样只处理一个出错点更简单
-		err := wsjson.Read(ctx, conn, &hresp)
-		if err == nil {
+		err2 := wsjson.Read(ctx, conn, &hresp)
+		if err2 == nil {
 			break
 		}
 		conn.CloseNow()
 		var e websocket.CloseError
-		if errors.As(err, &e) {
+		if errors.As(err2, &e) {
 			redirectEnabled := tm&WSRedirectEnabled != 0
 			if redirectEnabled {
 				switch e.Code {
@@ -159,16 +159,18 @@ func (ep *Outbound) connect(buf []byte) (err error) {
 					continue
 				case WsStatusPermanentRedirect:
 					link = e.Reason
-					ep.links[ep.lc] = link
-					ep.logger = ep.logger.With("endpoint", ep.links)
-					if h, ok := ep.peer.(PeerEndpiontRedirected); ok {
-						h.EndpiontRedirected(link, ep.lc)
-					}
+					defer err0.Then(&err, func() {
+						ep.links[ep.lc] = link
+						ep.logger = ep.logger.With("endpoint", ep.links)
+						if h, ok := ep.peer.(PeerEndpiontRedirected); ok {
+							h.EndpiontRedirected(link, ep.lc)
+						}
+					}, nil)
 					continue
 				}
 			}
 		}
-		try.To(err)
+		try.To(err2)
 	}
 	t.Stop()
 
