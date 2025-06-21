@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -25,7 +26,14 @@ func (b *Bind) ParseEndpoint(s string) (conn.Endpoint, error) {
 	peer := b.config.GetPeer(nil, s)
 
 	// init outbound
-	outbound := &Outbound{link: s}
+	outbound := &Outbound{}
+	if !strings.HasPrefix(s, "[") {
+		outbound.links = []string{s}
+	} else {
+		if err := json.Unmarshal([]byte(s), &outbound.links); err != nil {
+			return nil, err
+		}
+	}
 	outbound.bind = b
 	outbound.logger = b.logger.With("peer", peer.GetID()).With("endpoint", s)
 	outbound.peer = peer
@@ -41,7 +49,8 @@ func (b *Bind) ParseEndpoint(s string) (conn.Endpoint, error) {
 type Outbound struct {
 	Endpoint
 	nat.INAT
-	link string
+	lc    int //link cursor
+	links []string
 
 	connecting atomic.Bool
 	wantClear  atomic.Bool
@@ -84,6 +93,8 @@ func (ep *Outbound) connect(buf []byte) (err error) {
 
 	defer err0.Then(&err, nil, func() {
 		ep.logger.Error("connect failed", "error", err)
+		lc := (ep.lc + 1) % len(ep.links)
+		ep.lc = lc
 	})
 
 	ctx := context.Background()
@@ -115,7 +126,7 @@ func (ep *Outbound) connect(buf []byte) (err error) {
 	}
 
 	var conn *websocket.Conn
-	link := ep.link
+	link := ep.links[ep.lc]
 	for {
 		opts := websocket.DialOptions{
 			Subprotocols: []string{magicStr},

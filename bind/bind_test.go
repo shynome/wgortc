@@ -139,6 +139,32 @@ func TestWebSocketRedirect(t *testing.T) {
 	}
 }
 
+func TestClient3(t *testing.T) {
+	tdev, tnet := try.To2(netstack.CreateNetTUN(
+		[]netip.Addr{netip.MustParseAddr("192.168.7.2")},
+		[]netip.Addr{netip.MustParseAddr("8.8.8.8"), netip.MustParseAddr("8.8.4.4")},
+		bind.MTU,
+	))
+	bind := bind.New(&Config{peer: &Peer{id: "p1"}})
+	bind.SetName("client")
+	logger := logger.New("client")
+	dev := device.NewDevice(tdev, bind, logger)
+	try.To(dev.IpcSet(p3cfg))
+	try.To(dev.Up())
+	defer dev.Close()
+
+	client := &http.Client{
+		Transport: &http.Transport{DialContext: tnet.DialContext},
+		Timeout:   30 * time.Second,
+	}
+	resp := try.To1(client.Get("http://192.168.7.1/"))
+	body := try.To1(io.ReadAll(resp.Body))
+
+	if body := string(body); body != testCheckResponseText {
+		t.Error(body)
+	}
+}
+
 // key: 4KKSeQMXqfT0SRV/f7LkPbWjpyjCS6IfBwr7gY2nr0M=
 // key(hex): e0a292790317a9f4f449157f7fb2e43db5a3a728c24ba21f070afb818da7af43
 // pubkey: UwJ8NDnTdT/XM1VC8wPF7iu0GMP3FK81qRPSQlHQ7jU=
@@ -160,6 +186,11 @@ allowed_ip=192.168.7.1/32`
 var p22cfg = `private_key=2031c164da5791899abdcdc9842bc203d6d387a7e8d887c1d43fc5ea613ac578
 public_key=53027c3439d3753fd7335542f303c5ee2bb418c3f714af35a913d24251d0ee35
 endpoint=ws://127.0.0.1:7789
+allowed_ip=192.168.7.1/32`
+
+var p3cfg = `private_key=2031c164da5791899abdcdc9842bc203d6d387a7e8d887c1d43fc5ea613ac578
+public_key=53027c3439d3753fd7335542f303c5ee2bb418c3f714af35a913d24251d0ee35
+endpoint=["ws://127.0.0.1:7789","ws://127.0.0.1:7788"]
 allowed_ip=192.168.7.1/32`
 
 type Config struct {
