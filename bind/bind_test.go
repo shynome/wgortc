@@ -95,7 +95,7 @@ func testClient(t *testing.T) {
 	}
 }
 
-func TestWebSocketRedirect(t *testing.T) {
+func TestWebSocketTemporaryRedirect(t *testing.T) {
 	{
 		l := try.To1(net.Listen("tcp", "127.0.0.1:7789"))
 		defer l.Close()
@@ -137,6 +137,76 @@ func TestWebSocketRedirect(t *testing.T) {
 
 	if body := string(body); body != testCheckResponseText {
 		t.Error(body)
+	}
+}
+
+func TestWebSocketPermanentRedirect(t *testing.T) {
+	{
+		l := try.To1(net.Listen("tcp", "127.0.0.1:7789"))
+		defer l.Close()
+		h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			conn, err := websocket.Accept(w, r, bind.WsAcceptOptions)
+			if err != nil {
+				t.Error("websocket 连接失败", err)
+				return
+			}
+			err = conn.Close(bind.WsStatusPermanentRedirect, "ws://127.0.0.1:7788")
+			if err != nil {
+				t.Error(err)
+			}
+		})
+		go http.Serve(l, h)
+	}
+
+	tdev, tnet := try.To2(netstack.CreateNetTUN(
+		[]netip.Addr{netip.MustParseAddr("192.168.7.2")},
+		[]netip.Addr{netip.MustParseAddr("8.8.8.8"), netip.MustParseAddr("8.8.4.4")},
+		bind.MTU,
+	))
+	linkCh := make(chan string)
+	p := &Peer{id: "p1"}
+	p.redirected = func(link string, lc int) {
+		linkCh <- link
+	}
+	p.tm = bind.WSRedirectEnabled
+	bind := bind.New(&Config{peer: p})
+	bind.SetName("client")
+	logger := logger.New("client")
+	dev := device.NewDevice(tdev, bind, logger)
+	try.To(dev.IpcSet(p22cfg))
+	try.To(dev.Up())
+	defer dev.Close()
+
+	client := &http.Client{
+		Transport: &http.Transport{DialContext: tnet.DialContext},
+		Timeout:   30 * time.Second,
+	}
+	resp := try.To1(client.Get("http://192.168.7.1/"))
+	body := try.To1(io.ReadAll(resp.Body))
+
+	if body := string(body); body != testCheckResponseText {
+		t.Error(body)
+	}
+
+	nl := <-linkCh
+	if nl != "ws://127.0.0.1:7788" {
+		t.Errorf("want %s, got %s", "ws://127.0.0.1:7788", nl)
+		return
+	}
+
+	{
+		pubkey, _ := hex.DecodeString("53027c3439d3753fd7335542f303c5ee2bb418c3f714af35a913d24251d0ee35")
+		p := dev.LookupPeer(device.NoisePublicKey(pubkey))
+		p.ExpireCurrentKeypairs()
+	}
+
+	{
+		resp := try.To1(client.Get("http://192.168.7.1/"))
+		body := try.To1(io.ReadAll(resp.Body))
+
+		if body := string(body); body != testCheckResponseText {
+			t.Error(body)
+		}
 	}
 }
 
@@ -225,11 +295,20 @@ type Peer struct {
 	id     string
 	pcinit webrtc.Configuration
 	tm     bind.TransportMode
+
+	redirected func(link string, lc int)
 }
 
 var _ bind.Peer = (*Peer)(nil)
 var _ bind.PeerMode = (*Peer)(nil)
+var _ bind.PeerEndpiontRedirected = (*Peer)(nil)
 
 func (p *Peer) GetPeerInit() webrtc.Configuration { return p.pcinit }
 func (p *Peer) GetID() string                     { return p.id }
 func (p *Peer) TransportMode() bind.TransportMode { return p.tm }
+
+func (p *Peer) EndpiontRedirected(link string, lc int) {
+	if p.redirected != nil {
+		p.redirected(link, lc)
+	}
+}

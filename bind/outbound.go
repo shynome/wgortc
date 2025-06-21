@@ -35,7 +35,7 @@ func (b *Bind) ParseEndpoint(s string) (conn.Endpoint, error) {
 		}
 	}
 	outbound.bind = b
-	outbound.logger = b.logger.With("peer", peer.GetID()).With("endpoint", s)
+	outbound.logger = b.logger.With("peer", peer.GetID()).With("endpoint", outbound.links)
 	outbound.peer = peer
 
 	outbound.INAT = nat.Empty{}
@@ -152,9 +152,20 @@ func (ep *Outbound) connect(buf []byte) (err error) {
 		var e websocket.CloseError
 		if errors.As(err, &e) {
 			redirectEnabled := tm&WSRedirectEnabled != 0
-			if e.Code == WsStatusTemporaryRedirect && redirectEnabled {
-				link = e.Reason
-				continue
+			if redirectEnabled {
+				switch e.Code {
+				case WsStatusTemporaryRedirect:
+					link = e.Reason
+					continue
+				case WsStatusPermanentRedirect:
+					link = e.Reason
+					ep.links[ep.lc] = link
+					ep.logger = ep.logger.With("endpoint", ep.links)
+					if h, ok := ep.peer.(PeerEndpiontRedirected); ok {
+						h.EndpiontRedirected(link, ep.lc)
+					}
+					continue
+				}
 			}
 		}
 		try.To(err)

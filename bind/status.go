@@ -13,5 +13,10 @@ const (
 	WsStatusServiceUnavailable = WsStatusBase + http.StatusServiceUnavailable
 	WsStatusNotAcceptable      = WsStatusBase + http.StatusNotAcceptable
 	WsStatusTemporaryRedirect  = WsStatusBase + http.StatusTemporaryRedirect
+	WsStatusPermanentRedirect  = WsStatusBase + http.StatusPermanentRedirect
 	WsStatusClientClosed       = WsStatusBase + 499
 )
+
+type PeerEndpiontRedirected interface {
+	EndpiontRedirected(link string, lc int)
+}
