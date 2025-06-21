@@ -39,6 +39,7 @@ func New(config Config) *Bind {
 		config: config,
 		name:   magicStr,
 		msgs:   make(chan Packet),
+		logger: slog.With(),
 	}
 	b.SetName(b.name)
 	return b
@@ -46,7 +47,11 @@ func New(config Config) *Bind {
 
 func (b *Bind) SetName(name string) {
 	b.name = name
-	b.logger = slog.With("WireGuardBind", name)
+	b.logger = b.logger.With("WireGuardBind", name)
+}
+
+func (b *Bind) SetLogger(logger *slog.Logger) {
+	b.logger = logger.With("WireGuardBind", b.name)
 }
 
 func (b *Bind) Open(port uint16) (fns []conn.ReceiveFunc, actualPort uint16, err error) {
