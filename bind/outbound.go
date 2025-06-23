@@ -17,9 +17,9 @@ import (
 	"github.com/shynome/websocket/wsjson"
 	"github.com/shynome/wgortc/bind/browser"
 	"github.com/shynome/wgortc/bind/whip"
+	"github.com/shynome/wgortc/device/pubkey"
 	"github.com/shynome/wgortc/nat"
 	"golang.zx2c4.com/wireguard/conn"
-	"golang.zx2c4.com/wireguard/device"
 )
 
 func (b *Bind) ParseEndpoint(s string) (conn.Endpoint, error) {
@@ -115,7 +115,7 @@ func (ep *Outbound) connect(buf []byte) (err error) {
 		p2p_connected(err)
 	})
 
-	t := time.AfterFunc(device.RekeyTimeout, func() {
+	t := time.AfterFunc(pubkey.WebRTCConnectTimeout, func() {
 		p2p_connected(context.DeadlineExceeded)
 	})
 	defer t.Stop()
