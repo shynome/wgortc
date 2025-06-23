@@ -24,6 +24,9 @@ import (
 
 func (b *Bind) ParseEndpoint(s string) (conn.Endpoint, error) {
 	peer := b.config.GetPeer(nil, s)
+	if peer == nil {
+		return nil, fmt.Errorf("can't find peer by %s", s)
+	}
 
 	// init outbound
 	outbound := &Outbound{}
