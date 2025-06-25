@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.6.0] - 2025-06-25
+
+- 添加: pubkey.Initiator 函数以便用作认证
+
 ## [0.5.1] - 2025-06-23
 
 - 修复 GetPeer 可能为 nil 导致 panic 的问题
