@@ -65,8 +65,6 @@ type Outbound struct {
 	wantClear  atomic.Bool
 	ping       chan string
 	pong       chan string
-	expired    atomic.Bool
-	pubkey     device.NoisePublicKey
 }
 
 var _ conn.Endpoint = (*Outbound)(nil)
@@ -91,39 +89,8 @@ func (ep *Outbound) Send(buf []byte) error {
 		// 握手过程有点耗时
 		go ep.connect(buf)
 		return nil
-	} else {
-		ep.failFast()
 	}
 	return err
-}
-
-type PeerPubkey interface {
-	GetPubkey() device.NoisePublicKey
-}
-
-func (ep *Outbound) failFast() {
-	if ep.expired.Swap(true) {
-		return
-	}
-	if ep.pubkey.IsZero() {
-		return
-	}
-	dev := ep.bind.GetDevice()
-	if dev == nil {
-		return
-	}
-	peer := dev.LookupPeer(ep.pubkey)
-	if peer == nil {
-		return
-	}
-	peer.ExpireCurrentKeypairs()
-}
-
-func (ep *Outbound) receive(buf []byte) bool {
-	if buf[0] == WireGuardMessageResponder {
-		ep.expired.Store(false)
-	}
-	return ep.bind.Receive(ep, buf)
 }
 
 func (ep *Outbound) ClearSrc() {

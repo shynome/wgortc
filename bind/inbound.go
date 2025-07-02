@@ -68,6 +68,9 @@ func (b *Bind) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	inbound.logger = b.logger.With("peer", peer.GetID())
 	inbound.peer = peer
 	inbound.mode.Store(uint32(tm))
+	if p, ok := peer.(PeerPubkey); ok {
+		inbound.pubkey = p.GetPubkey()
+	}
 
 	inbound.INAT = nat.Empty{}
 	if natc, ok := peer.(nat.INAT); ok {
@@ -80,7 +83,7 @@ func (b *Bind) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		inbound.conn.Store(nil)
 	}()
 
-	if received := inbound.bind.Receive(inbound, hinit.Initiator); !received {
+	if received := inbound.receive(hinit.Initiator); !received {
 		conn.Close(WsStatusServiceUnavailable, "wg device is not up")
 		return
 	}
@@ -113,7 +116,7 @@ func (b *Bind) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				if nowsc && msg[0] == WireGuardMessageData {
 					continue
 				}
-				inbound.bind.Receive(inbound, msg)
+				inbound.receive(msg)
 			case websocket.MessageText:
 				var payload whip.Payload[json.RawMessage]
 				try.To(json.Unmarshal(msg, &payload))
@@ -246,7 +249,7 @@ func (ep *Inbound) handshake(signaler *serverSignaler, offer webrtc.SessionDescr
 				dc.SendText("pong")
 				return
 			}
-			ep.bind.Receive(ep, msg.Data)
+			ep.receive(msg.Data)
 		})
 
 		dc.OnOpen(func() {

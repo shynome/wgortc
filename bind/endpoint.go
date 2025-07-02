@@ -12,6 +12,7 @@ import (
 	"github.com/shynome/websocket"
 	"github.com/shynome/wgortc/bind/whip"
 	"golang.zx2c4.com/wireguard/conn"
+	"golang.zx2c4.com/wireguard/device"
 )
 
 type Endpoint struct {
@@ -23,6 +24,9 @@ type Endpoint struct {
 	pc   atomic.Pointer[webrtc.PeerConnection]
 	conn atomic.Pointer[websocket.Conn]
 	dc   atomic.Pointer[webrtc.DataChannel]
+
+	expired atomic.Bool
+	pubkey  device.NoisePublicKey
 }
 
 var _ conn.Endpoint = (*Endpoint)(nil)
@@ -43,7 +47,44 @@ func (ep *Endpoint) Send(buf []byte) error {
 		err := wsc.Write(ctx, websocket.MessageBinary, buf)
 		return err
 	}
+	ep.failFast()
 	return ErrNoDataChannel
+}
+
+type PeerPubkey interface {
+	GetPubkey() device.NoisePublicKey
+}
+
+func (ep *Endpoint) failFast() {
+	if ep.expired.Swap(true) {
+		return
+	}
+	if ep.pubkey.IsZero() {
+		return
+	}
+	dev := ep.bind.GetDevice()
+	if dev == nil {
+		return
+	}
+	peer := dev.LookupPeer(ep.pubkey)
+	if peer == nil {
+		return
+	}
+	peer.ExpireCurrentKeypairs()
+}
+
+func (ep *Inbound) receive(buf []byte) bool {
+	if buf[0] == WireGuardMessageResponder {
+		ep.expired.Store(false)
+	}
+	return ep.bind.Receive(ep, buf)
+}
+
+func (ep *Outbound) receive(buf []byte) bool {
+	if buf[0] == WireGuardMessageResponder {
+		ep.expired.Store(false)
+	}
+	return ep.bind.Receive(ep, buf)
 }
 
 func (ep *Endpoint) ClearSrc() {
