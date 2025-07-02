@@ -12,6 +12,7 @@ import (
 	"github.com/shynome/err0"
 	"github.com/shynome/wgortc/bind/whip"
 	"golang.zx2c4.com/wireguard/conn"
+	"golang.zx2c4.com/wireguard/device"
 )
 
 type Bind struct {
@@ -21,6 +22,7 @@ type Bind struct {
 	logger *slog.Logger
 	api    atomic.Pointer[webrtc.API]
 	cancel context.CancelFunc
+	Device atomic.Pointer[device.Device]
 }
 
 var _ conn.Bind = (*Bind)(nil)
@@ -71,6 +73,7 @@ func (b *Bind) Open(port uint16) (fns []conn.ReceiveFunc, actualPort uint16, err
 type bindPower interface {
 	Receive(ep conn.Endpoint, buf []byte) bool
 	NewPeerConnection(cfg webrtc.Configuration) (*webrtc.PeerConnection, error)
+	GetDevice() *device.Device
 }
 
 var _ bindPower = (*Bind)(nil)
@@ -90,6 +93,10 @@ func (b *Bind) NewPeerConnection(cfg webrtc.Configuration) (*webrtc.PeerConnecti
 	} else {
 		return api.NewPeerConnection(cfg)
 	}
+}
+
+func (b *Bind) GetDevice() *device.Device {
+	return b.Device.Load()
 }
 
 func (b *Bind) makeReceiveFunc(ctx context.Context) conn.ReceiveFunc {

@@ -43,6 +43,9 @@ func (b *Bind) ParseEndpoint(s string) (conn.Endpoint, error) {
 	outbound.peer = peer
 	outbound.ping = make(chan string)
 	outbound.pong = make(chan string)
+	if p, ok := peer.(PeerPubkey); ok {
+		outbound.pubkey = p.GetPubkey()
+	}
 
 	outbound.INAT = nat.Empty{}
 	if natc, ok := peer.(nat.INAT); ok {
@@ -62,6 +65,8 @@ type Outbound struct {
 	wantClear  atomic.Bool
 	ping       chan string
 	pong       chan string
+	expired    atomic.Bool
+	pubkey     device.NoisePublicKey
 }
 
 var _ conn.Endpoint = (*Outbound)(nil)
@@ -86,8 +91,39 @@ func (ep *Outbound) Send(buf []byte) error {
 		// 握手过程有点耗时
 		go ep.connect(buf)
 		return nil
+	} else {
+		ep.failFast()
 	}
 	return err
+}
+
+type PeerPubkey interface {
+	GetPubkey() device.NoisePublicKey
+}
+
+func (ep *Outbound) failFast() {
+	if ep.expired.Swap(true) {
+		return
+	}
+	if ep.pubkey.IsZero() {
+		return
+	}
+	dev := ep.bind.GetDevice()
+	if dev == nil {
+		return
+	}
+	peer := dev.LookupPeer(ep.pubkey)
+	if peer == nil {
+		return
+	}
+	peer.ExpireCurrentKeypairs()
+}
+
+func (ep *Outbound) receive(buf []byte) bool {
+	if buf[0] == WireGuardMessageResponder {
+		ep.expired.Store(false)
+	}
+	return ep.bind.Receive(ep, buf)
 }
 
 func (ep *Outbound) ClearSrc() {
@@ -218,7 +254,7 @@ func (ep *Outbound) connect(buf []byte) (err error) {
 			typ, msg := try.To2(conn.Read(ctx))
 			switch typ {
 			case websocket.MessageBinary:
-				ep.bind.Receive(ep, msg)
+				ep.receive(msg)
 			case websocket.MessageText:
 				var payload whip.Payload[json.RawMessage]
 				try.To(json.Unmarshal(msg, &payload))
@@ -319,7 +355,7 @@ func (ep *Outbound) handshake(signaler *clientSignaler) (err error) {
 			}
 			return
 		}
-		ep.bind.Receive(ep, msg.Data)
+		ep.receive(msg.Data)
 	})
 	if pc := ep.pc.Swap(pc); pc != nil {
 		pc.Close()
