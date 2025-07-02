@@ -362,7 +362,9 @@ func (ep *Outbound) handshake(signaler *clientSignaler) (err error) {
 				case <-ctx.Done():
 					return
 				case ping := <-ep.ping:
+					ep.logger.Debug("ping send")
 					if err := dc.SendText(ping); err != nil {
+						ep.logger.Debug("ping send failed", "error", err)
 						return
 					}
 					if exit := func() (exit bool) {
@@ -370,8 +372,10 @@ func (ep *Outbound) handshake(signaler *clientSignaler) (err error) {
 						defer cancel()
 						select {
 						case <-ctx.Done():
+							ep.logger.Debug("ping timeout", "error", ctx.Err())
 							return true
 						case <-ep.pong:
+							ep.logger.Debug("pong received")
 							return false
 						}
 					}(); exit {
