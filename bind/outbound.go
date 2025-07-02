@@ -20,6 +20,7 @@ import (
 	"github.com/shynome/wgortc/device/pubkey"
 	"github.com/shynome/wgortc/nat"
 	"golang.zx2c4.com/wireguard/conn"
+	"golang.zx2c4.com/wireguard/device"
 )
 
 func (b *Bind) ParseEndpoint(s string) (conn.Endpoint, error) {
@@ -40,6 +41,8 @@ func (b *Bind) ParseEndpoint(s string) (conn.Endpoint, error) {
 	outbound.bind = b
 	outbound.logger = b.logger.With("peer", peer.GetID()).With("endpoint", outbound.links)
 	outbound.peer = peer
+	outbound.ping = make(chan string)
+	outbound.pong = make(chan string)
 
 	outbound.INAT = nat.Empty{}
 	if natc, ok := peer.(nat.INAT); ok {
@@ -57,6 +60,8 @@ type Outbound struct {
 
 	connecting atomic.Bool
 	wantClear  atomic.Bool
+	ping       chan string
+	pong       chan string
 }
 
 var _ conn.Endpoint = (*Outbound)(nil)
@@ -66,6 +71,12 @@ var _ nat.INAT = (*Outbound)(nil)
 func (ep *Outbound) Send(buf []byte) error {
 	if connecting := ep.connecting.Load(); connecting {
 		ep.wantClear.Store(false)
+	}
+	if buf[0] == WireGuardMessageData && len(buf) == device.MessageTransportSize {
+		select {
+		case ep.ping <- "ping":
+		default:
+		}
 	}
 	err := ep.Endpoint.Send(buf)
 	if err == nil {
@@ -301,6 +312,13 @@ func (ep *Outbound) handshake(signaler *clientSignaler) (err error) {
 	}
 	dc := try.To1(pc.CreateDataChannel(magicStr, &dcinit))
 	dc.OnMessage(func(msg webrtc.DataChannelMessage) {
+		if msg.IsString {
+			select {
+			case ep.pong <- string(msg.Data):
+			default:
+			}
+			return
+		}
 		ep.bind.Receive(ep, msg.Data)
 	})
 	if pc := ep.pc.Swap(pc); pc != nil {
@@ -336,6 +354,32 @@ func (ep *Outbound) handshake(signaler *clientSignaler) (err error) {
 	dc.OnOpen(func() {
 		defer cause(nil)
 		ep.dc.Store(dc)
+		go func() {
+			defer ep.dc.Store(nil)
+			defer dc.Close()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case ping := <-ep.ping:
+					if err := dc.SendText(ping); err != nil {
+						return
+					}
+					if exit := func() (exit bool) {
+						ctx, cancel := context.WithTimeout(ctx, device.RekeyTimeout)
+						defer cancel()
+						select {
+						case <-ctx.Done():
+							return true
+						case <-ep.pong:
+							return false
+						}
+					}(); exit {
+						return
+					}
+				}
+			}
+		}()
 	})
 	dc.OnClose(func() {
 		defer cause(net.ErrClosed)

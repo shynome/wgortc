@@ -242,6 +242,10 @@ func (ep *Inbound) handshake(signaler *serverSignaler, offer webrtc.SessionDescr
 			return
 		}
 		dc.OnMessage(func(msg webrtc.DataChannelMessage) {
+			if msg.IsString {
+				dc.SendText("pong")
+				return
+			}
 			ep.bind.Receive(ep, msg.Data)
 		})
 
