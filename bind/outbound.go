@@ -293,10 +293,16 @@ func (ep *Outbound) handshake(signaler *clientSignaler) (err error) {
 				select {
 				case <-ctx.Done():
 					return
-				case <-signaler.serverCandidates:
+				case _, ok := <-signaler.serverCandidates:
 					// 任何事都不做, 只是避免阻塞
-				case <-signaler.answer:
+					if !ok {
+						return
+					}
+				case _, ok := <-signaler.answer:
 					// 任何事都不做, 只是避免阻塞
+					if !ok {
+						return
+					}
 				}
 			}
 		}()
