@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.7.1] - 2025-07-03
+
+- 修复 BUG: 未判断 select chan 是否 closed, 导致 for 总是 select closed chan 造成空 for 循环 100% CPU 过载, 而网页版只有一个 CPU 直接卡死了
+- 添加快速重连到 inbound 中
+- 优化 outbound 快速重连, dc closed 就可以要求重新 handshake 了
+
 ## [0.7.0] - 2025-07-02
 
 - 添加快速重连功能, 可在 2 个 keepalive 周期 + 5s 内快速重连, 比默认的 120s 重连快多了 (感觉有更好的重试方法, 但我不知道 orz, 先用着吧)
