@@ -103,10 +103,9 @@ func (ep *Outbound) ClearSrc() {
 }
 
 func (ep *Outbound) connect(buf []byte) (err error) {
-	if connecting := ep.connecting.Load(); connecting {
+	if connecting := ep.connecting.Swap(true); connecting {
 		return
 	}
-	ep.connecting.Store(true)
 
 	defer err0.Then(&err, func() {
 		ep.lc = 0 // 连接成功后将lc重置为0, 还是以第一个endpoint为主, 剩余的作为辅助
