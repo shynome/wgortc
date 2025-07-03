@@ -358,6 +358,7 @@ func (ep *Outbound) handshake(signaler *clientSignaler) (err error) {
 		defer cause(nil)
 		ep.dc.Store(dc)
 		go func() {
+			defer ep.failFast()
 			defer ep.dc.Store(nil)
 			defer dc.Close()
 			for {
