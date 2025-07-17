@@ -21,3 +21,8 @@ const (
 var ErrNoDataChannel = errors.New("no available data channel")
 var ErrWSCDrop = errors.New("drop data when ws transport disabled")
 var ErrWebRTCDisabled = errors.New("drop data when ws transport disabled")
+
+type PeerHandshakeHook interface {
+	HandshakeInitiationHook(initiator *HandshakeInitiation)
+	HandshakeResponseHook(hresp *HandshakeResponse)
+}

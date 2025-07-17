@@ -137,6 +137,12 @@ func (ep *Outbound) connect(buf []byte) (err error) {
 		Initiator: buf,
 	}
 	var hresp HandshakeResponse
+	if peer, ok := ep.peer.(PeerHandshakeHook); ok {
+		peer.HandshakeInitiationHook(&hinit)
+		defer err0.Then(&err, func() {
+			peer.HandshakeResponseHook(&hresp)
+		}, nil)
+	}
 
 	var tm TransportMode
 	if m, ok := ep.peer.(PeerMode); ok {

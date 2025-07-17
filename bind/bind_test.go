@@ -289,7 +289,10 @@ type Config struct {
 
 var _ bind.Config = (*Config)(nil)
 
-func (c *Config) GetPeer(initiator []byte, endpoint string) bind.Peer { return c.peer }
+func (c *Config) GetPeer(initiator []byte, endpoint string) bind.Peer {
+	c.peer.inbound = len(initiator) != 0
+	return c.peer
+}
 
 type Peer struct {
 	id     string
@@ -297,6 +300,7 @@ type Peer struct {
 	tm     bind.TransportMode
 
 	redirected func(link string, lc int)
+	inbound    bool
 }
 
 var _ bind.Peer = (*Peer)(nil)
@@ -311,4 +315,15 @@ func (p *Peer) EndpiontRedirected(link string, lc int) {
 	if p.redirected != nil {
 		p.redirected(link, lc)
 	}
+}
+
+var _ bind.PeerHandshakeHook = (*Peer)(nil)
+
+func (p *Peer) HandshakeInitiationHook(initiator *bind.HandshakeInitiation) {
+	if true {
+		return
+	}
+}
+func (p *Peer) HandshakeResponseHook(hresp *bind.HandshakeResponse) {
+	return
 }

@@ -60,6 +60,10 @@ func (b *Bind) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	hresp := HandshakeResponse{
 		TransportMode: uint32(tm),
 	}
+	if peer, ok := peer.(PeerHandshakeHook); ok {
+		peer.HandshakeInitiationHook(&hinit)
+		peer.HandshakeResponseHook(&hresp)
+	}
 	try.To(wsjson.Write(ctx, conn, hresp))
 
 	// init inbound
@@ -168,10 +172,14 @@ func (b *Bind) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 type HandshakeInitiation struct {
 	Initiator []byte `json:"initiator"`
+
+	Extra json.RawMessage `json:"extra"`
 }
 
 type HandshakeResponse struct {
 	TransportMode uint32 `json:"transport_mode"`
+
+	Extra json.RawMessage `json:"extra"`
 }
 
 type Inbound struct {
