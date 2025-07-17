@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.8.0] - 2025-07-17
+
+- 添加 PeerHandshakeHook, 便于 salt-link 扩展
+
 ## [0.7.1] - 2025-07-03
 
 - 修复 BUG: 未判断 select chan 是否 closed, 导致 for 总是 select closed chan 造成空 for 循环 100% CPU 过载, 而网页版只有一个 CPU 直接卡死了
