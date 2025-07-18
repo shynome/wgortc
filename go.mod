@@ -9,6 +9,7 @@ require (
 	github.com/shynome/websocket v1.9.1
 	golang.org/x/crypto v0.33.0
 	golang.zx2c4.com/wireguard v0.0.0-20231211153847-12269c276173
+	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20241231184526-a9ab2273dd10
 	gvisor.dev/gvisor v0.0.0-20230927004350-cbd86285d259
 )
 
