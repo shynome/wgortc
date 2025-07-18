@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.8.1] - 2025-07-18
+
+- 添加 simple.Config 用于测试
+- 添加 vtun.DialContext 便于测试
+
 ## [0.8.0] - 2025-07-17
 
 - 添加 PeerHandshakeHook, 便于 salt-link 扩展
