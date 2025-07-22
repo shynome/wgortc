@@ -66,7 +66,7 @@ func (c *Config) normalize() (err error) {
 	}
 
 	if c.NAT == "" {
-		c.NAT = "192.168.7.1/24"
+		c.NAT = "192.168.211.1/20"
 	}
 	if c.NAT6 == "" {
 		c.NAT6 = "fdd9:f800::1/24"
