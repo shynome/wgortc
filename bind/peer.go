@@ -1,6 +1,10 @@
 package bind
 
-import "errors"
+import (
+	"errors"
+
+	"golang.zx2c4.com/wireguard/conn"
+)
 
 type PeerMode interface {
 	TransportMode() TransportMode
@@ -25,4 +29,5 @@ var ErrWebRTCDisabled = errors.New("drop data when ws transport disabled")
 type PeerHandshakeHook interface {
 	HandshakeInitiationHook(initiator *HandshakeInitiation)
 	HandshakeResponseHook(hresp *HandshakeResponse)
+	HandshakedHook(ep conn.Endpoint)
 }

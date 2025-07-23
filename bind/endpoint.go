@@ -34,6 +34,9 @@ var _ whip.Sender = (*Endpoint)(nil)
 
 func (ep *Endpoint) Send(buf []byte) error {
 	tm := TransportMode(ep.mode.Load())
+	if peer, ok := ep.peer.(PeerHandshakeHook); ok && buf[0] == WireGuardMessageResponder {
+		peer.HandshakedHook(ep)
+	}
 	if dc := ep.dc.Load(); dc != nil {
 		err := dc.Send(buf)
 		return err
@@ -76,6 +79,9 @@ func (ep *Endpoint) failFast() {
 func (ep *Inbound) receive(buf []byte) bool {
 	if buf[0] == WireGuardMessageResponder {
 		ep.expired.Store(false)
+		if peer, ok := ep.peer.(PeerHandshakeHook); ok {
+			peer.HandshakedHook(ep)
+		}
 	}
 	return ep.bind.Receive(ep, buf)
 }
@@ -83,6 +89,9 @@ func (ep *Inbound) receive(buf []byte) bool {
 func (ep *Outbound) receive(buf []byte) bool {
 	if buf[0] == WireGuardMessageResponder {
 		ep.expired.Store(false)
+		if peer, ok := ep.peer.(PeerHandshakeHook); ok {
+			peer.HandshakedHook(ep)
+		}
 	}
 	return ep.bind.Receive(ep, buf)
 }

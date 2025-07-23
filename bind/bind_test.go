@@ -15,6 +15,7 @@ import (
 	"github.com/shynome/websocket"
 	"github.com/shynome/wgortc/bind"
 	"github.com/shynome/wgortc/device/logger"
+	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"
 	"golang.zx2c4.com/wireguard/tun/netstack"
 )
@@ -325,5 +326,12 @@ func (p *Peer) HandshakeInitiationHook(initiator *bind.HandshakeInitiation) {
 	}
 }
 func (p *Peer) HandshakeResponseHook(hresp *bind.HandshakeResponse) {
-	return
+	if true {
+		return
+	}
+}
+func (p *Peer) HandshakedHook(ep conn.Endpoint) {
+	if true {
+		return
+	}
 }
