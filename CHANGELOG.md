@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.8.4] - 2025-01-08
+
+- 修复: ClearSrc 不应当阻塞, 使用 `go` 调用 `pc.Close()` 和 `wsc.Close()`
+
 ## [0.8.3] - 2025-07-23
 
 - 添加 peer.HandshakedHook 以便知晓哪些节点是两分钟内在线的
