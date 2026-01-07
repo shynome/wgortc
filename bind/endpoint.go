@@ -99,10 +99,10 @@ func (ep *Outbound) receive(buf []byte) bool {
 func (ep *Endpoint) ClearSrc() {
 	ep.logger.Debug("clear src")
 	if pc := ep.pc.Swap(nil); pc != nil {
-		pc.Close()
+		go pc.Close()
 	}
 	if wsc := ep.conn.Swap(nil); wsc != nil {
-		wsc.Close(websocket.StatusNormalClosure, "clear src")
+		go wsc.Close(websocket.StatusNormalClosure, "clear src")
 	}
 }
 
