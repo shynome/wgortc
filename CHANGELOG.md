@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.8.5] - 2026-02-05
+
+- 更新: `simple.Config` IPv6 地址和 well-net 保持一致, 更改为 `2001:00f0::/28`
+
 ## [0.8.4] - 2025-01-08
 
 - 修复: ClearSrc 不应当阻塞, 使用 `go` 调用 `pc.Close()` 和 `wsc.Close()`
