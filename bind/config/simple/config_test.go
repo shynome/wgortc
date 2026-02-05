@@ -17,7 +17,7 @@ func TestConfig(t *testing.T) {
 				Endpoint: "ws://127.0.0.1:7788/link",
 				Auto:     10,
 				Allow:    "192.168.7.3/32",
-				Allow6:   "fdd9:f800::2/128",
+				Allow6:   "2001:00f0::2/128",
 			},
 		},
 	}

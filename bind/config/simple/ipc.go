@@ -32,7 +32,7 @@ func (p *Peer) String() string {
 		fmt.Fprintf(b, "allowed_ip=%s\n", p.Allow)
 		if allow, err := netip.ParsePrefix(p.Allow); err == nil {
 			addr := allow.Addr()
-			fmt.Fprintf(b, "allowed_ip=fdd9:f8f4::%s/128\n", addr.String())
+			fmt.Fprintf(b, "allowed_ip=2001:00f4::%s/128\n", addr.String())
 		}
 	}
 	if p.Allow6 != "" {

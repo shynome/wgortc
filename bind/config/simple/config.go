@@ -69,7 +69,7 @@ func (c *Config) normalize() (err error) {
 		c.NAT = "192.168.211.1/20"
 	}
 	if c.NAT6 == "" {
-		c.NAT6 = "fdd9:f800::1/24"
+		c.NAT6 = "2001:00f0::/28"
 	}
 
 	pf := try.To1(netip.ParsePrefix(c.NAT))
@@ -99,7 +99,7 @@ func (c *Config) normalize() (err error) {
 			allow := try.To1(netip.ParsePrefix(p.Allow))
 			n.SetNAT4(allow.Addr(), dst)
 			if allow6 == "" {
-				allow6 = fmt.Sprintf("fdd9:f8f4::%s/128", allow.Addr().String())
+				allow6 = fmt.Sprintf("2001:00f4::%s/128", allow.Addr().String())
 			}
 		}
 		if allow6 != "" {
