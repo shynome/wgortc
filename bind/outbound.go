@@ -264,7 +264,11 @@ func (ep *Outbound) connect(buf []byte) (err error) {
 	handshake := func() {
 		defer p2p_connected(nil)
 		defer func() {
-			ep.conn.Store(nil)
+			if conn := ep.conn.Swap(nil); conn != nil {
+				time.AfterFunc(time.Second, func() {
+					conn.Close(websocket.StatusNormalClosure, "handshaked")
+				})
+			}
 		}()
 		for {
 			select {
