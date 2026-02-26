@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.9.2] - 2026-02-26
+
+- 变更: `NATC.Ports` 由 `map[uint16]bool` 变更为 `map[uint16]struct{}`
+
 ## [0.9.1] - 2026-02-26
 
 - 变更: `NATC.Ports` 由 `[]uint16` 变更为 `map[uint16]bool`
