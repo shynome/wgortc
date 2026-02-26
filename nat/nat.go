@@ -10,7 +10,7 @@ import (
 type NATC struct {
 	Src4, Dst4 tcpip.Address
 	Src6, Dst6 tcpip.Address
-	Ports      map[uint16]bool
+	Ports      map[uint16]struct{}
 }
 
 func New() *NATC {
@@ -86,7 +86,7 @@ func (n *NATC) NAT(buf []byte) {
 		if n.Ports == nil {
 			return
 		}
-		if n.Ports[port] {
+		if _, ok := n.Ports[port]; ok {
 			return
 		}
 		switch ndst.Len() {
