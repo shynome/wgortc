@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.9.3] - 2026-02-27
+
+- 移除: `NATC.Ports`. DNAT 做不到禁止访问本机端口, 因为回包的端口是不确定的, 可以在 tun 设备上做防火墙
+
 ## [0.9.2] - 2026-02-26
 
 - 变更: `NATC.Ports` 由 `map[uint16]bool` 变更为 `map[uint16]struct{}`
