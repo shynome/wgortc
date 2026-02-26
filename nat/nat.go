@@ -2,7 +2,6 @@ package nat
 
 import (
 	"net/netip"
-	"slices"
 
 	"gvisor.dev/gvisor/pkg/tcpip"
 	"gvisor.dev/gvisor/pkg/tcpip/header"
@@ -11,7 +10,7 @@ import (
 type NATC struct {
 	Src4, Dst4 tcpip.Address
 	Src6, Dst6 tcpip.Address
-	Ports      []uint16
+	Ports      map[uint16]bool
 }
 
 func New() *NATC {
@@ -87,7 +86,7 @@ func (n *NATC) NAT(buf []byte) {
 		if n.Ports == nil {
 			return
 		}
-		if slices.Contains(n.Ports, port) {
+		if n.Ports[port] {
 			return
 		}
 		switch ndst.Len() {
