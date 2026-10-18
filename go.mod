@@ -1,20 +1,20 @@
 module github.com/shynome/wgortc
 
-go 1.24.0
+go 1.26.0
 
 require (
 	github.com/pion/ice/v4 v4.0.10
 	github.com/pion/webrtc/v4 v4.0.15
 	github.com/shynome/err0 v0.2.1
 	github.com/shynome/websocket v1.9.1
-	golang.org/x/crypto v0.33.0
-	golang.zx2c4.com/wireguard v0.0.0-20231211153847-12269c276173
+	golang.org/x/crypto v0.37.0
+	golang.zx2c4.com/wireguard v0.0.0-20261006164505-2631ce99a06f
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20241231184526-a9ab2273dd10
-	gvisor.dev/gvisor v0.0.0-20230927004350-cbd86285d259
+	gvisor.dev/gvisor v0.0.0-20250503011706-39ed1f5ac29c
 )
 
 require (
-	github.com/google/btree v1.0.1 // indirect
+	github.com/google/btree v1.1.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/pion/datachannel v1.5.10 // indirect
 	github.com/pion/dtls/v3 v3.0.6 // indirect
@@ -31,10 +31,10 @@ require (
 	github.com/pion/transport/v3 v3.0.7 // indirect
 	github.com/pion/turn/v4 v4.0.0 // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
-	golang.org/x/net v0.35.0 // indirect
-	golang.org/x/sys v0.30.0 // indirect
-	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8 // indirect
+	golang.org/x/net v0.39.0 // indirect
+	golang.org/x/sys v0.32.0 // indirect
+	golang.org/x/time v0.7.0 // indirect
 	golang.zx2c4.com/wintun v0.0.0-20230126152724-0fa3db229ce2 // indirect
 )
 
-replace golang.zx2c4.com/wireguard => github.com/remoon-net/wireguard-go v0.0.0-20250101131202-1eae1370c284
+replace golang.zx2c4.com/wireguard => github.com/remoon-net/wireguard-go v0.0.0-20261018095158-6c2ca6255f2d
