@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.4] - 2026-10-18
+
+- 更新: Go 版本升级到 1.26
+- 更新: wireguard-go fork 同步上游 master (2026-10-06), 保留 NAT 支持
+- 变更: vtun 适配 gvisor 新版 `Read` API
+
 ## [0.9.3] - 2026-02-27
 
 - 移除: `NATC.Ports`. DNAT 做不到禁止访问本机端口, 因为回包的端口是不确定的, 可以在 tun 设备上做防火墙
